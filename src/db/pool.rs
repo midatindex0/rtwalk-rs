@@ -2,7 +2,6 @@ use anyhow::Result;
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use r2d2::Pool;
-use std::env;
 
 pub type PostgresPool = Pool<ConnectionManager<PgConnection>>;
 

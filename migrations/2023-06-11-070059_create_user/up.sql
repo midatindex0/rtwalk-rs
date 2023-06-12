@@ -5,4 +5,4 @@ CREATE TABLE users (
     display_name VARCHAR NOT NULL,
     bio TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
-)
+);

@@ -1,16 +1,18 @@
 use crate::schema::users;
+use async_graphql::SimpleObject;
 use chrono::NaiveDateTime;
 use diesel::{Insertable, Queryable, Selectable};
-use juniper::{GraphQLInputObject, GraphQLObject};
 
 /// Represents a user in the db.
 /// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Debug, Queryable, GraphQLObject, Selectable)]
+#[derive(Debug, Queryable, Selectable, SimpleObject)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct User {
+    #[graphql(skip)]
     pub id: i32,
     pub username: String,
+    #[graphql(skip)]
     password: String,
     pub display_name: String,
     pub bio: Option<String>,
@@ -33,11 +35,4 @@ pub struct NewUser<'a> {
     pub password: &'a str,
     pub display_name: &'a str,
     pub bio: Option<&'a str>,
-}
-
-/// Represents an user signup data
-#[derive(Debug, GraphQLInputObject)]
-pub struct NewUserGql {
-    pub username: String,
-    pub password: String,
 }

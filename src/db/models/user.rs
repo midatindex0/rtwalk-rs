@@ -1,13 +1,22 @@
-use crate::schema::users;
-use async_graphql::SimpleObject;
+use crate::{
+    db::pool::PostgresPool,
+    schema::{forums, users},
+};
+
+use async_graphql::{ComplexObject, Context, SimpleObject};
 use chrono::NaiveDateTime;
-use diesel::{Insertable, Queryable, Selectable};
+use diesel::prelude::*;
+use diesel::{Identifiable, Insertable, Queryable, Selectable};
+
+use super::forum::Forum;
 
 /// Represents a user in the db.
 /// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Debug, Queryable, Selectable, SimpleObject)]
+#[derive(Debug, Queryable, Selectable, Identifiable, PartialEq, SimpleObject)]
+#[diesel(primary_key(username))]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[graphql(complex)]
 pub struct User {
     #[graphql(skip)]
     pub id: i32,
@@ -24,6 +33,18 @@ impl User {
     /// Returns [true] if it matches
     pub fn match_password(&self, _password: String) -> bool {
         bool::default()
+    }
+}
+
+#[ComplexObject]
+impl User {
+    async fn owned_forums<'ctx>(&self, ctx: &Context<'ctx>) -> async_graphql::Result<Vec<Forum>> {
+        let pool = ctx.data::<PostgresPool>().unwrap();
+        let mut conn = pool.get()?;
+        let forums = forums::table
+            .filter(forums::dsl::owner_id.eq(self.id))
+            .load::<Forum>(&mut conn)?;
+        Ok(forums)
     }
 }
 

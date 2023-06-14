@@ -1,6 +1,6 @@
 CREATE TABLE users (
-    id SERIAL,
-    username VARCHAR PRIMARY KEY,
+    id SERIAL UNIQUE,
+    username VARCHAR UNIQUE PRIMARY KEY,
     password VARCHAR NOT NULL,
     display_name VARCHAR NOT NULL,
     bio TEXT,

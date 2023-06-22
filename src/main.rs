@@ -11,6 +11,11 @@ use actix_web::{middleware, web, App, HttpServer};
 use argon2::Argon2;
 use dotenvy::dotenv;
 use env_logger;
+use opendal::{
+    layers::{LoggingLayer, RetryLayer},
+    services::Fs,
+    Operator,
+};
 use std::env;
 
 use self::db::pool;
@@ -35,11 +40,19 @@ async fn main() -> std::io::Result<()> {
         .data(pool.clone())
         .data(version)
         .finish();
+    let mut fs_builder = Fs::default();
+    fs_builder.root("data/").enable_path_check();
+    let data = Operator::new(fs_builder)
+        .expect("Could not create fs data store")
+        .layer(LoggingLayer::default())
+        .layer(RetryLayer::new())
+        .finish();
 
     log::info!("Starting http setver at http://127.0.0.1:8000/");
 
     HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(data.clone()))
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(hasher.clone()))

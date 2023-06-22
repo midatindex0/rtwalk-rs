@@ -1,5 +1,5 @@
 use crate::{
-    db::pool::PostgresPool,
+    db::{models::File, pool::PostgresPool},
     schema::{forums, users},
 };
 
@@ -12,8 +12,7 @@ use super::forum::Forum;
 
 /// Represents a user in the db.
 /// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Debug, Queryable, Selectable, Identifiable, PartialEq, SimpleObject)]
-#[diesel(primary_key(username))]
+#[derive(Debug, Queryable, Selectable, Identifiable, SimpleObject)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[graphql(complex)]
@@ -25,6 +24,7 @@ pub struct User {
     password: String,
     pub display_name: String,
     pub bio: Option<String>,
+    pub pfp: Option<File>,
     pub created_at: NaiveDateTime,
 }
 

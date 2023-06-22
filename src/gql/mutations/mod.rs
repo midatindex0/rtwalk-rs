@@ -51,17 +51,22 @@ impl Mutation {
         let salt = SaltString::generate(&mut OsRng);
         let hashed_pass = hasher
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
+            .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?
+            .to_string();
 
-        let insert_res = user::create_user(username, hashed_pass.to_string(), &mut conn)
-            .map(|_| true)
-            .map_err(|e| {
-                e.extend_with(|err, e| match err {
-                    UserCreationError::UsernameAlreadyExists(_) => e.set("code", "409"),
-                    UserCreationError::InternalError(_) => e.set("code", "500"),
-                    _ => unreachable!(),
+        let insert_res = actix_rt::task::spawn_blocking(move || {
+            user::create_user(username, hashed_pass, &mut conn)
+                .map(|_| true)
+                .map_err(|e| {
+                    e.extend_with(|err, e| match err {
+                        UserCreationError::UsernameAlreadyExists(_) => e.set("code", "409"),
+                        UserCreationError::InternalError(_) => e.set("code", "500"),
+                        _ => unreachable!(),
+                    })
                 })
-            });
+        })
+        .await
+        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
         insert_res
     }
 }

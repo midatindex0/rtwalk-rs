@@ -50,8 +50,6 @@ async fn main() -> std::io::Result<()> {
         .layer(RetryLayer::new())
         .finish();
 
-    log::info!("Starting http setver at http://127.0.0.1:8000/");
-
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(data.clone()))

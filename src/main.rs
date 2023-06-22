@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod db;
+pub mod error;
 mod gql;
 mod handlers;
 pub mod helpers;
@@ -19,7 +20,7 @@ use opendal::{
 use std::env;
 
 use self::db::pool;
-use self::gql::root::{EmptyMutation, EmptySubscription, Query, Schema};
+use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
 use self::handlers::gql::{gql_handler, gql_playground_handler};
 
 #[actix_rt::main]
@@ -36,8 +37,9 @@ async fn main() -> std::io::Result<()> {
         bug_fix: 1,
         version_string: "0.1.0 alpha",
     };
-    let schema = Schema::build(Query, EmptyMutation, EmptySubscription)
+    let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool.clone())
+        .data(hasher.clone())
         .data(version)
         .finish();
     let mut fs_builder = Fs::default();

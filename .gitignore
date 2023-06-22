@@ -4,3 +4,5 @@
 !.env.example
 data/**
 !data/data.txt
+
+todo.md

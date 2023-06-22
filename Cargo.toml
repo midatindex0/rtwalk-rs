@@ -22,3 +22,4 @@ async-graphql-actix-web = "5.0.10"
 log = "0.4.19"
 actix-web-lab = "0.19.1"
 opendal = { version = "0.37.0", features = ["layers-all", "services-fs"]}
+thiserror = "1.0.40"

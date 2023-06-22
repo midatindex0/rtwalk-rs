@@ -5,5 +5,6 @@ CREATE TABLE users (
     display_name VARCHAR NOT NULL,
     bio TEXT,
     pfp VARCHAR,
+    banner VARCHAR,
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );

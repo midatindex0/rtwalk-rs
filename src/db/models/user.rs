@@ -25,6 +25,7 @@ pub struct User {
     pub display_name: String,
     pub bio: Option<String>,
     pub pfp: Option<File>,
+    pub banner: Option<File>,
     pub created_at: NaiveDateTime,
 }
 

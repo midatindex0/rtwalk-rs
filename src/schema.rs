@@ -18,6 +18,7 @@ diesel::table! {
         display_name -> Varchar,
         bio -> Nullable<Text>,
         pfp -> Nullable<Varchar>,
+        banner -> Nullable<Varchar>,
         created_at -> Timestamp,
     }
 }

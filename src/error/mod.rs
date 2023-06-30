@@ -28,3 +28,27 @@ impl<'a> std::fmt::Display for UserCreationError<'a> {
         }
     }
 }
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum ForumCreationError<'a> {
+    // Forum Name Errors
+    InvalidName(&'a str),
+    ForumAlreadyExists(&'a str),
+    ReservedName(&'a str),
+    // Db errors
+    InternalError(&'a str),
+}
+
+impl<'a> std::error::Error for ForumCreationError<'a> {}
+
+impl<'a> std::fmt::Display for ForumCreationError<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            ForumCreationError::InvalidName(m) => write!(f, "{}", m),
+            ForumCreationError::ForumAlreadyExists(m) => write!(f, "{}", m),
+            ForumCreationError::ReservedName(m) => write!(f, "{}", m),
+            ForumCreationError::InternalError(m) => write!(f, "{}", m),
+        }
+    }
+}

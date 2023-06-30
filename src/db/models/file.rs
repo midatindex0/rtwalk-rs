@@ -29,6 +29,6 @@ where
     String: deserialize::FromSql<VarChar, B>,
 {
     fn from_sql(bytes: <B as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
-        <String as deserialize::FromSql<VarChar, B>>::from_sql(bytes).map(|id| File::new(id))
+        <String as deserialize::FromSql<VarChar, B>>::from_sql(bytes).map(File::new)
     }
 }

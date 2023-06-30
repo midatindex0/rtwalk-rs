@@ -23,3 +23,5 @@ log = "0.4.19"
 actix-web-lab = "0.19.1"
 opendal = { version = "0.37.0", features = ["layers-all", "services-fs"]}
 thiserror = "1.0.40"
+actix-files = "0.6.2"
+rusty_paseto = "0.5.0"

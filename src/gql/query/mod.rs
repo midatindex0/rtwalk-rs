@@ -9,7 +9,7 @@ use crate::{
 
 pub struct Query;
 
-#[Object]
+#[Object(cache_control(max_age = 60))]
 impl Query {
     async fn version<'c>(&self, ctx: &Context<'c>) -> Result<&'c VersionInfo> {
         ctx.data::<VersionInfo>()

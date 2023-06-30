@@ -1,3 +1,4 @@
+pub mod forum;
 pub mod user;
 
 use argon2::{
@@ -54,7 +55,7 @@ impl Mutation {
             .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?
             .to_string();
 
-        let insert_res = actix_rt::task::spawn_blocking(move || {
+        actix_rt::task::spawn_blocking(move || {
             user::create_user(username, hashed_pass, &mut conn)
                 .map(|_| true)
                 .map_err(|e| {
@@ -66,7 +67,18 @@ impl Mutation {
                 })
         })
         .await
-        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
-        insert_res
+        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?
+    }
+
+    async fn login<'c>(
+        &self,
+        ctx: &Context<'c>,
+        _username: String,
+        _password: String,
+    ) -> Result<bool> {
+        let _conn = ctx.data::<PostgresPool>()?.get()?;
+        let _hasher = ctx.data::<Argon2>()?;
+
+        Ok(true)
     }
 }

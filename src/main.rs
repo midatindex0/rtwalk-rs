@@ -1,22 +1,25 @@
 #![allow(dead_code)]
 
+pub mod auth;
 mod db;
 pub mod error;
 mod gql;
 mod handlers;
 pub mod helpers;
 mod info;
+mod media;
 pub mod schema;
 
 use actix_web::{middleware, web, App, HttpServer};
 use argon2::Argon2;
 use dotenvy::dotenv;
-use env_logger;
 use opendal::{
     layers::{LoggingLayer, RetryLayer},
     services::Fs,
     Operator,
 };
+use rusty_paseto::prelude::*;
+
 use std::env;
 
 use self::db::pool;
@@ -29,6 +32,9 @@ async fn main() -> std::io::Result<()> {
 
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL not set");
+    let paseto_key = PasetoSymmetricKey::<V4, Local>::from(Key::from(
+        env::var("AUTH_KEY").expect("AUTH_KEY not set").as_bytes(),
+    ));
     let pool = pool::get_pool(&db_url).expect("Could not create database pool");
     let hasher = Argon2::default();
     let version = info::VersionInfo {
@@ -40,6 +46,7 @@ async fn main() -> std::io::Result<()> {
     let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool.clone())
         .data(hasher.clone())
+        .data(paseto_key)
         .data(version)
         .finish();
     let mut fs_builder = Fs::default();
@@ -50,6 +57,8 @@ async fn main() -> std::io::Result<()> {
         .layer(RetryLayer::new())
         .finish();
 
+    log::info!("Running server at http://127.0.0.1:8000/graphiql");
+
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(data.clone()))
@@ -58,6 +67,16 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(hasher.clone()))
             .service(gql_handler)
             .service(gql_playground_handler)
+            .service(
+                web::scope("/media")
+                    .service(media::pfp)
+                    // TODO: Probably remove
+                    .service(
+                        actix_files::Files::new("/", "data/")
+                            .show_files_listing()
+                            .use_last_modified(true),
+                    ),
+            )
             .wrap(middleware::Logger::default())
     })
     .bind("127.0.0.1:8000")

@@ -21,20 +21,13 @@ pub struct User {
     pub id: i32,
     pub username: String,
     #[graphql(skip)]
-    password: String,
+    pub password: String,
     pub display_name: String,
     pub bio: Option<String>,
     pub pfp: Option<File>,
     pub banner: Option<File>,
     pub created_at: NaiveDateTime,
-}
-
-impl User {
-    /// Matches the raw password with the hashed password in constant time.
-    /// Returns [true] if it matches
-    pub fn match_password(&self, _password: String) -> bool {
-        bool::default()
-    }
+    pub v: i32,
 }
 
 #[ComplexObject]

@@ -20,6 +20,7 @@ diesel::table! {
         pfp -> Nullable<Varchar>,
         banner -> Nullable<Varchar>,
         created_at -> Timestamp,
+        v -> Int4,
     }
 }
 

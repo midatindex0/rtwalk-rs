@@ -31,6 +31,27 @@ impl<'a> std::fmt::Display for UserCreationError<'a> {
 
 #[non_exhaustive]
 #[derive(Debug)]
+pub enum UserAuthError<'a> {
+    InvalidUsernameOrPassword(&'a str),
+    UserNotFound(&'a str),
+    // Db errors
+    InternalError(&'a str),
+}
+
+impl<'a> std::error::Error for UserAuthError<'a> {}
+
+impl<'a> std::fmt::Display for UserAuthError<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            UserAuthError::InvalidUsernameOrPassword(m) => write!(f, "{}", m),
+            UserAuthError::UserNotFound(m) => write!(f, "{}", m),
+            UserAuthError::InternalError(m) => write!(f, "{}", m),
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
 pub enum ForumCreationError<'a> {
     // Forum Name Errors
     InvalidName(&'a str),

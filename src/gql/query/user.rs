@@ -1,6 +1,6 @@
 use diesel::prelude::*;
-
 use crate::db::models::user::User;
+
 use crate::schema::users::dsl::*;
 
 type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;

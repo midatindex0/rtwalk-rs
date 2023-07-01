@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![warn(missing_debug_implementations)]
 
 pub mod auth;
 mod db;

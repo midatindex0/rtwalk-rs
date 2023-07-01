@@ -6,5 +6,6 @@ CREATE TABLE users (
     bio TEXT,
     pfp VARCHAR,
     banner VARCHAR,
-    created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
+    created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    v SERIAL
 );

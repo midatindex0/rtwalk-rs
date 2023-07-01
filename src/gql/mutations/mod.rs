@@ -7,8 +7,10 @@ use argon2::{
 };
 
 use async_graphql::{Context, ErrorExtensions, Object, Result};
+use rusty_paseto::prelude::{Local, PasetoSymmetricKey, V4};
 
 use crate::helpers::{calculate_password_strength, check_reserved_username};
+use crate::{auth::AuthUser, error::UserAuthError};
 use crate::{db::pool::PostgresPool, error::UserCreationError};
 
 pub struct Mutation;
@@ -73,12 +75,45 @@ impl Mutation {
     async fn login<'c>(
         &self,
         ctx: &Context<'c>,
-        _username: String,
-        _password: String,
+        username: String,
+        password: String,
     ) -> Result<bool> {
-        let _conn = ctx.data::<PostgresPool>()?.get()?;
-        let _hasher = ctx.data::<Argon2>()?;
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+        let hasher = ctx.data::<Argon2>()?.clone();
+        let paseto_key = ctx.data::<PasetoSymmetricKey<V4, Local>>()?;
+        let to_be_moved_username = username.clone();
 
-        Ok(true)
+        let x = actix_rt::task::spawn_blocking(move || {
+            user::verify_user(&to_be_moved_username, &password, &mut conn, &hasher)
+        })
+        .await
+        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
+
+        match x {
+            Ok((true, v)) => {
+                let user = AuthUser {
+                    username: Some(username),
+                    version: v,
+                }
+                .to_token(paseto_key)?;
+                ctx.insert_http_header("auth", user);
+                Ok(true)
+            }
+            Ok((false, _)) => Err(UserAuthError::InvalidUsernameOrPassword(
+                "Username or password is invalid",
+            )
+            .extend_with(|_, e| e.set("code", "401"))),
+            Err(e) => match e {
+                UserAuthError::UserNotFound(_) => Err(UserAuthError::InvalidUsernameOrPassword(
+                    "Username or password is invalid",
+                )
+                .extend_with(|_, e| e.set("code", "401"))),
+                UserAuthError::InternalError(_) => Err(UserAuthError::InternalError(
+                    "Some internal error occured. Try again",
+                )
+                .extend_with(|_, e| e.set("code", "500"))),
+                UserAuthError::InvalidUsernameOrPassword(_) => unreachable!(),
+            },
+        }
     }
 }

@@ -7,5 +7,5 @@ CREATE TABLE users (
     pfp VARCHAR,
     banner VARCHAR,
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    v SERIAL
+    v INTEGER NOT NULL DEFAULT 0
 );

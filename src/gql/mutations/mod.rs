@@ -91,12 +91,12 @@ impl Mutation {
 
         match x {
             Ok((true, v)) => {
-                let user = AuthUser {
+                let token = AuthUser {
                     username: Some(username),
                     version: v,
                 }
                 .to_token(paseto_key)?;
-                ctx.insert_http_header("auth", user);
+                ctx.insert_http_header("Set-Cookie", format!("auth={token}; Secure; HttpOnly"));
                 Ok(true)
             }
             Ok((false, _)) => Err(UserAuthError::InvalidUsernameOrPassword(
@@ -115,5 +115,15 @@ impl Mutation {
                 UserAuthError::InvalidUsernameOrPassword(_) => unreachable!(),
             },
         }
+    }
+
+    async fn logout<'c>(&self, ctx: &Context<'c>) -> bool {
+        ctx.insert_http_header("Set-Cookie", format!("auth=None"));
+        true
+    }
+
+    // TODO: Reset token by updating user version
+    async fn reset_tokens<'c>(&self, ctx: &Context<'c>) -> Result<bool> {
+        Ok(true)
     }
 }

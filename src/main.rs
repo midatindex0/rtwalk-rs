@@ -9,6 +9,7 @@ mod handlers;
 pub mod helpers;
 mod info;
 mod media;
+pub mod core;
 pub mod schema;
 
 use actix_web::{middleware, web, App, HttpServer};

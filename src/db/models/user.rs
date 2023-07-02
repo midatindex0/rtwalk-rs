@@ -27,6 +27,7 @@ pub struct User {
     pub pfp: Option<File>,
     pub banner: Option<File>,
     pub created_at: NaiveDateTime,
+    #[graphql(skip)]
     pub v: i32,
 }
 

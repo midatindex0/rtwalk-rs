@@ -4,5 +4,5 @@ CREATE TABLE forums (
     name VARCHAR UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    owner_id SERIAL REFERENCES users(id)
+    owner_id INTEGER NOT NULL REFERENCES users(id)
 );

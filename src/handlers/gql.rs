@@ -6,10 +6,7 @@ use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use crate::gql::root::Schema;
 
 #[route("/gql", method = "GET", method = "POST")]
-pub async fn gql_handler(
-    schema: web::Data<Schema>,
-    req: GraphQLRequest,
-) -> GraphQLResponse {
+pub async fn gql_handler(schema: web::Data<Schema>, req: GraphQLRequest) -> GraphQLResponse {
     let req = req.into_inner();
     schema.execute(req).await.into()
 }
@@ -17,6 +14,7 @@ pub async fn gql_handler(
 #[get("/graphiql")]
 async fn gql_playground_handler() -> impl Responder {
     Html(playground_source(
-        GraphQLPlaygroundConfig::new("/gql").subscription_endpoint("/gql"),
+        GraphQLPlaygroundConfig::new("/gql")
+            .with_setting("request.credentials", "same-origin"),
     ))
 }

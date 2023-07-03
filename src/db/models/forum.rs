@@ -13,6 +13,9 @@ use crate::schema::{forums, users};
 pub struct Forum {
     pub id: i32,
     pub name: String,
+    pub display_name: String,
+    pub icon: Option<String>,
+    pub banner: Option<String>,
     pub description: Option<String>,
     pub created_at: NaiveDateTime,
     pub owner_id: i32,
@@ -35,6 +38,7 @@ impl Forum {
 #[diesel(table_name = forums)]
 pub struct NewForum<'a> {
     pub name: &'a str,
+    pub display_name: &'a str,
     pub description: Option<&'a str>,
     pub owner_id: i32,
 }

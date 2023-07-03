@@ -70,6 +70,6 @@ pub fn verify_user<'a>(
         hasher
             .verify_password(_password.as_bytes(), &parsed_hash)
             .is_ok(),
-        _user.v,
+        _user.id,
     ))
 }

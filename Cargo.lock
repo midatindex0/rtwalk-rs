@@ -1068,6 +1068,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deunicode"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
+
+[[package]]
 name = "diesel"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2557,9 +2563,11 @@ dependencies = [
  "log",
  "opendal",
  "r2d2",
+ "rand",
  "send_wrapper",
  "serde",
  "serde_json",
+ "slug",
  "thiserror",
  "uuid",
 ]
@@ -2845,6 +2853,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6528351c9bc8ab22353f9d776db39a20288e8d6c37ef8cfe3317cf875eecfc2d"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "slug"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3bc762e6a4b6c6fcaade73e77f9ebc6991b676f88bb2358bddb56560f073373"
+dependencies = [
+ "deunicode",
 ]
 
 [[package]]

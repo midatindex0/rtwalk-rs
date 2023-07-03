@@ -9,6 +9,6 @@ CREATE TABLE posts (
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     edited BOOLEAN NOT NULL DEFAULT FALSE,
     edited_at TIMESTAMP,
-    forum INTEGER NOT NULL REFERENCES forums(id),
-    poster INTEGER NOT NULL REFERENCES users(id)
+    forum_id INTEGER NOT NULL REFERENCES forums(id),
+    poster_id INTEGER NOT NULL REFERENCES users(id)
 );

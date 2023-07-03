@@ -1,25 +1,30 @@
 use diesel::{insert_into, RunQueryDsl};
 use log;
 
-use crate::db::models::forum::NewForum;
+use crate::db::models::forum::{Forum, NewForum};
 use crate::error::ForumCreationError;
 use crate::schema::forums::dsl::*;
 
 type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
-pub fn create_forum(
+pub fn create_forum<'a>(
     _owner_id: i32,
     _forum_name: String,
+    _display_name: String,
     _description: String,
     conn: &mut Conn,
-) -> Result<usize, ForumCreationError> {
+) -> Result<Forum, ForumCreationError<'a>> {
     let new_forum = NewForum {
         name: &_forum_name,
+        display_name: &_display_name,
         description: Some(&_description),
         owner_id: _owner_id,
     };
-    match insert_into(forums).values(&new_forum).execute(conn) {
-        Ok(_id) => Ok(_id),
+    match insert_into(forums)
+        .values(&new_forum)
+        .get_result::<Forum>(conn)
+    {
+        Ok(_forum) => Ok(_forum),
         Err(err) => match err {
             diesel::result::Error::DatabaseError(kind, info) => match kind {
                 diesel::result::DatabaseErrorKind::UniqueViolation => Err(

@@ -27,3 +27,5 @@ actix-files = "0.6.2"
 uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
 actix-session = { version = "0.7.2", features = ["redis-actor-session"] }
 send_wrapper = "0.6.0"
+slug = "0.1.4"
+rand = "0.8.5"

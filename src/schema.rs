@@ -4,6 +4,9 @@ diesel::table! {
     forums (id) {
         id -> Int4,
         name -> Varchar,
+        display_name -> Varchar,
+        icon -> Nullable<Varchar>,
+        banner -> Nullable<Varchar>,
         description -> Nullable<Text>,
         created_at -> Timestamp,
         owner_id -> Int4,
@@ -22,8 +25,8 @@ diesel::table! {
         created_at -> Timestamp,
         edited -> Bool,
         edited_at -> Nullable<Timestamp>,
-        forum -> Int4,
-        poster -> Int4,
+        forum_id -> Int4,
+        poster_id -> Int4,
     }
 }
 
@@ -42,8 +45,8 @@ diesel::table! {
 }
 
 diesel::joinable!(forums -> users (owner_id));
-diesel::joinable!(posts -> forums (forum));
-diesel::joinable!(posts -> users (poster));
+diesel::joinable!(posts -> forums (forum_id));
+diesel::joinable!(posts -> users (poster_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     forums,

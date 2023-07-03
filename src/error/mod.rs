@@ -18,13 +18,13 @@ impl<'a> std::error::Error for UserCreationError<'a> {}
 impl<'a> std::fmt::Display for UserCreationError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            UserCreationError::InvalidUsername(m) => write!(f, "{}", m),
-            UserCreationError::UsernameAlreadyExists(m) => write!(f, "{}", m),
-            UserCreationError::ReservedUsername(m) => write!(f, "{}", m),
-            UserCreationError::PasswordTooShort(m) => write!(f, "{}", m),
-            UserCreationError::PasswordTooLong(m) => write!(f, "{}", m),
-            UserCreationError::LowPasswordStrength(m) => write!(f, "{}", m),
-            UserCreationError::InternalError(m) => write!(f, "{}", m),
+            Self::InvalidUsername(m) => write!(f, "{}", m),
+            Self::UsernameAlreadyExists(m) => write!(f, "{}", m),
+            Self::ReservedUsername(m) => write!(f, "{}", m),
+            Self::PasswordTooShort(m) => write!(f, "{}", m),
+            Self::PasswordTooLong(m) => write!(f, "{}", m),
+            Self::LowPasswordStrength(m) => write!(f, "{}", m),
+            Self::InternalError(m) => write!(f, "{}", m),
         }
     }
 }
@@ -43,9 +43,9 @@ impl<'a> std::error::Error for UserAuthError<'a> {}
 impl<'a> std::fmt::Display for UserAuthError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            UserAuthError::InvalidUsernameOrPassword(m) => write!(f, "{}", m),
-            UserAuthError::UserNotFound(m) => write!(f, "{}", m),
-            UserAuthError::InternalError(m) => write!(f, "{}", m),
+            Self::InvalidUsernameOrPassword(m) => write!(f, "{}", m),
+            Self::UserNotFound(m) => write!(f, "{}", m),
+            Self::InternalError(m) => write!(f, "{}", m),
         }
     }
 }
@@ -66,10 +66,28 @@ impl<'a> std::error::Error for ForumCreationError<'a> {}
 impl<'a> std::fmt::Display for ForumCreationError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            ForumCreationError::InvalidName(m) => write!(f, "{}", m),
-            ForumCreationError::ForumAlreadyExists(m) => write!(f, "{}", m),
-            ForumCreationError::ReservedName(m) => write!(f, "{}", m),
-            ForumCreationError::InternalError(m) => write!(f, "{}", m),
+            Self::InvalidName(m) => write!(f, "{}", m),
+            Self::ForumAlreadyExists(m) => write!(f, "{}", m),
+            Self::ReservedName(m) => write!(f, "{}", m),
+            Self::InternalError(m) => write!(f, "{}", m),
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum PostCreationError<'a> {
+    InternalError(&'a str),
+    ForumNotFound(&'a str),
+}
+
+impl<'a> std::error::Error for PostCreationError<'a> {}
+
+impl<'a> std::fmt::Display for PostCreationError<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::InternalError(m) => write!(f, "{}", m),
+            Self::ForumNotFound(m) => write!(f, "{}", m),
         }
     }
 }

@@ -1,5 +1,6 @@
-pub mod forum;
-pub mod user;
+mod forum;
+mod post;
+mod user;
 
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
@@ -7,11 +8,13 @@ use argon2::{
 };
 use async_graphql::{Context, ErrorExtensions, Object, Result, Upload};
 use opendal::Operator;
+use rand::Rng;
 
 use crate::{
-    auth::{SharedSession},
+    auth::SharedSession,
     constants,
-    error::UserAuthError,
+    db::models::{forum::Forum, post::Post},
+    error::{UserAuthError},
 };
 use crate::{
     db::models::File,
@@ -100,9 +103,9 @@ impl Mutation {
         .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
 
         match x {
-            Ok((true, v)) => {
+            Ok((true, id)) => {
+                session.insert("id", id)?;
                 session.insert("username", username)?;
-                session.insert("version", v)?;
                 Ok(true)
             }
             Ok((false, _)) => Err(UserAuthError::InvalidUsernameOrPassword(
@@ -147,6 +150,59 @@ impl Mutation {
                 files.push(file);
             }
             return Ok(files);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
+    async fn create_forum<'c>(
+        &self,
+        ctx: &Context<'c>,
+        name: String,
+        description: String,
+    ) -> Result<Forum> {
+        let slugged_name = slug::slugify(name.clone());
+        let session = ctx.data::<SharedSession>()?;
+
+        if session.get::<String>("username")?.is_some() {
+            let owner_id = session.get::<i32>("id")?.unwrap();
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+            let x = actix_rt::task::spawn_blocking(move || {
+                forum::create_forum(owner_id, slugged_name, name, description, &mut conn)
+            })
+            .await??;
+            return Ok(x);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
+    async fn create_post<'c>(
+        &self,
+        ctx: &Context<'c>,
+        tags: Option<Vec<String>>,
+        title: String,
+        content: Option<String>,
+        media: Option<Vec<String>>,
+        forum: i32,
+    ) -> Result<Post> {
+        let session = ctx.data::<SharedSession>()?;
+        let random_suffix = rand::thread_rng().gen_range(1..=9999);
+        let slug = format!("{}-{}", slug::slugify(title.clone()), random_suffix);
+        if session.get::<String>("username")?.is_some() {
+            let poster_id = session.get::<i32>("id")?.unwrap();
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+            let x = actix_rt::task::spawn_blocking(move || {
+                post::create_post(
+                    tags, title, slug, content, media, forum, poster_id, &mut conn,
+                )
+            })
+            .await??;
+            return Ok(x);
         }
         Err(
             async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)

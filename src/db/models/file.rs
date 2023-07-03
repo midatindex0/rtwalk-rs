@@ -2,6 +2,9 @@ use async_graphql::SimpleObject;
 use diesel::{
     backend::Backend, deserialize, serialize, sql_types::VarChar, AsExpression, FromSqlRow,
 };
+use opendal::Operator;
+
+use std::io::prelude::*;
 
 #[derive(AsExpression, FromSqlRow, Debug, SimpleObject)]
 #[diesel(sql_type = VarChar)]
@@ -12,6 +15,13 @@ pub struct File {
 impl File {
     pub fn new(id: String) -> Self {
         Self { id }
+    }
+
+    pub async fn save(&self, fp: &mut std::fs::File, op: &Operator) -> anyhow::Result<()> {
+        let mut buffer = vec![];
+        fp.read_to_end(&mut buffer)?;
+        op.write(&self.id, buffer).await?;
+        Ok(())
     }
 }
 

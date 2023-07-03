@@ -5,12 +5,18 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
 };
+use async_graphql::{Context, ErrorExtensions, Object, Result, Upload};
+use opendal::Operator;
 
-use async_graphql::{Context, ErrorExtensions, Object, Result};
-use rusty_paseto::prelude::{Local, PasetoSymmetricKey, V4};
-
-use crate::helpers::{calculate_password_strength, check_reserved_username};
-use crate::{auth::AuthUser, error::UserAuthError};
+use crate::{
+    auth::{SharedSession},
+    constants,
+    error::UserAuthError,
+};
+use crate::{
+    db::models::File,
+    helpers::{calculate_password_strength, check_reserved_username},
+};
 use crate::{db::pool::PostgresPool, error::UserCreationError};
 
 pub struct Mutation;
@@ -80,8 +86,12 @@ impl Mutation {
     ) -> Result<bool> {
         let mut conn = ctx.data::<PostgresPool>()?.get()?;
         let hasher = ctx.data::<Argon2>()?.clone();
-        let paseto_key = ctx.data::<PasetoSymmetricKey<V4, Local>>()?;
+        let session = ctx.data::<SharedSession>()?;
         let to_be_moved_username = username.clone();
+
+        if session.get::<String>("username")?.is_some() {
+            return Ok(true);
+        }
 
         let x = actix_rt::task::spawn_blocking(move || {
             user::verify_user(&to_be_moved_username, &password, &mut conn, &hasher)
@@ -91,12 +101,8 @@ impl Mutation {
 
         match x {
             Ok((true, v)) => {
-                let token = AuthUser {
-                    username: Some(username),
-                    version: v,
-                }
-                .to_token(paseto_key)?;
-                ctx.insert_http_header("Set-Cookie", format!("auth={token}; Secure; HttpOnly"));
+                session.insert("username", username)?;
+                session.insert("version", v)?;
                 Ok(true)
             }
             Ok((false, _)) => Err(UserAuthError::InvalidUsernameOrPassword(
@@ -117,13 +123,34 @@ impl Mutation {
         }
     }
 
-    async fn logout<'c>(&self, ctx: &Context<'c>) -> bool {
-        ctx.insert_http_header("Set-Cookie", format!("auth=None"));
-        true
+    async fn logout<'c>(&self, ctx: &Context<'c>) -> Result<bool> {
+        let session = ctx.data::<SharedSession>()?;
+        session.purge();
+        Ok(true)
     }
 
-    // TODO: Reset token by updating user version
-    async fn reset_tokens<'c>(&self, ctx: &Context<'c>) -> Result<bool> {
-        Ok(true)
+    async fn upload<'c>(&self, ctx: &Context<'c>, uploads: Vec<Upload>) -> Result<Vec<File>> {
+        let session = ctx.data::<SharedSession>()?;
+        let username = session.get::<String>("username")?;
+        let mut files = Vec::with_capacity(uploads.len());
+        if let Some(username) = username {
+            let operator = ctx.data::<Operator>()?;
+            for upload in uploads {
+                let mut upload = upload.value(ctx)?;
+                let file = File::new(format!(
+                    "temp/{}/{}.{}",
+                    username,
+                    uuid::Uuid::new_v4(),
+                    upload.filename
+                ));
+                file.save(&mut upload.content, operator).await?;
+                files.push(file);
+            }
+            return Ok(files);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
     }
 }

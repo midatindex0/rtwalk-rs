@@ -24,4 +24,6 @@ actix-web-lab = "0.19.1"
 opendal = { version = "0.37.0", features = ["layers-all", "services-fs"]}
 thiserror = "1.0.40"
 actix-files = "0.6.2"
-rusty_paseto = "0.5.0"
+uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
+actix-session = { version = "0.7.2", features = ["redis-actor-session"] }
+send_wrapper = "0.6.0"

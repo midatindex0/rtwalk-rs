@@ -1,15 +1,19 @@
-pub mod user;
+mod post;
+mod user;
 
 use async_graphql::{Context, Object, Result};
 
 use crate::{
-    db::{models::user::User, pool::PostgresPool},
+    db::{
+        models::{post::Post, user::User},
+        pool::PostgresPool,
+    },
     info::VersionInfo,
 };
 
 pub struct Query;
 
-#[Object(cache_control(max_age = 60))]
+#[Object]
 impl Query {
     async fn version<'c>(&self, ctx: &Context<'c>) -> Result<&'c VersionInfo> {
         ctx.data::<VersionInfo>()
@@ -24,5 +28,20 @@ impl Query {
         })
         .await??;
         Ok(user)
+    }
+
+    async fn posts<'c>(
+        &self,
+        ctx: &Context<'c>,
+        forum: i32,
+        order: post::PostOrder,
+    ) -> Result<Vec<Post>> {
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+
+        let posts =
+            actix_rt::task::spawn_blocking(move || post::get_posts(forum, &order, &mut conn))
+                .await??;
+
+        Ok(posts)
     }
 }

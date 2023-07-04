@@ -13,8 +13,11 @@ use rand::Rng;
 use crate::{
     auth::SharedSession,
     constants,
-    db::models::{forum::Forum, post::Post},
-    error::{UserAuthError},
+    db::models::{
+        forum::Forum,
+        post::{InputPost, Post},
+    },
+    error::UserAuthError,
 };
 use crate::{
     db::models::File,
@@ -141,7 +144,7 @@ impl Mutation {
             for upload in uploads {
                 let mut upload = upload.value(ctx)?;
                 let file = File::new(format!(
-                    "temp/{}/{}.{}",
+                    "media/{}/{}.{}",
                     username,
                     uuid::Uuid::new_v4(),
                     upload.filename
@@ -181,24 +184,27 @@ impl Mutation {
         )
     }
 
-    async fn create_post<'c>(
-        &self,
-        ctx: &Context<'c>,
-        tags: Option<Vec<String>>,
-        title: String,
-        content: Option<String>,
-        media: Option<Vec<String>>,
-        forum: i32,
-    ) -> Result<Post> {
+    async fn create_post<'c>(&self, ctx: &Context<'c>, input_post: InputPost) -> Result<Post> {
         let session = ctx.data::<SharedSession>()?;
         let random_suffix = rand::thread_rng().gen_range(1..=9999);
-        let slug = format!("{}-{}", slug::slugify(title.clone()), random_suffix);
+        let slug = format!(
+            "{}-{}",
+            slug::slugify(input_post.title.clone()),
+            random_suffix
+        );
         if session.get::<String>("username")?.is_some() {
             let poster_id = session.get::<i32>("id")?.unwrap();
             let mut conn = ctx.data::<PostgresPool>()?.get()?;
             let x = actix_rt::task::spawn_blocking(move || {
                 post::create_post(
-                    tags, title, slug, content, media, forum, poster_id, &mut conn,
+                    input_post.tags,
+                    input_post.title,
+                    slug,
+                    input_post.content,
+                    input_post.media,
+                    input_post.forum,
+                    poster_id,
+                    &mut conn,
                 )
             })
             .await??;

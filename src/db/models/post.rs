@@ -1,4 +1,4 @@
-use async_graphql::{ComplexObject, Context, SimpleObject};
+use async_graphql::{ComplexObject, Context, SimpleObject, InputObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
@@ -58,4 +58,16 @@ pub struct NewPost {
     pub media: Option<Vec<String>>,
     pub forum_id: i32,
     pub poster_id: i32,
+}
+
+#[derive(InputObject)]
+pub struct InputPost {
+    #[graphql(default)]
+    pub tags: Option<Vec<String>>,
+    pub title: String,
+    #[graphql(default)]
+    pub content: Option<String>,
+    #[graphql(default)]
+    pub media: Option<Vec<String>>,
+    pub forum: i32,
 }

@@ -23,17 +23,13 @@ use opendal::{
     Operator,
 };
 
-use std::{
-    collections::HashMap,
-    env,
-    sync::{Arc, RwLock},
-};
+use std::env;
 
 use self::db::pool;
 use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
 use self::handlers::gql::{gql_handler, gql_playground_handler};
 
-pub type UserVMap = Arc<RwLock<HashMap<String, i32>>>;
+type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {

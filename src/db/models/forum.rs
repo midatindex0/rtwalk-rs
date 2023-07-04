@@ -18,6 +18,7 @@ pub struct Forum {
     pub banner: Option<String>,
     pub description: Option<String>,
     pub created_at: NaiveDateTime,
+    #[graphql(skip)]
     pub owner_id: i32,
 }
 

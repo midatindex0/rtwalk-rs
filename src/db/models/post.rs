@@ -1,4 +1,4 @@
-use async_graphql::{ComplexObject, Context, SimpleObject, InputObject};
+use async_graphql::{ComplexObject, Context, InputObject, SimpleObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
@@ -24,7 +24,44 @@ pub struct Post {
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
     pub forum_id: i32,
+    #[graphql(skip)]
     pub poster_id: i32,
+}
+
+#[derive(SimpleObject)]
+pub struct PostWithoutUser {
+    pub id: i32,
+    pub tags: Option<Vec<Option<String>>>,
+    pub stars: i32,
+    pub title: String,
+    pub slug: String,
+    pub content: Option<String>,
+    pub media: Option<Vec<Option<String>>>,
+    pub created_at: NaiveDateTime,
+    pub edited: bool,
+    pub edited_at: Option<NaiveDateTime>,
+    pub forum_id: i32,
+    #[graphql(skip)]
+    pub poster_id: i32,
+}
+
+impl From<Post> for PostWithoutUser {
+    fn from(value: Post) -> Self {
+        Self {
+            id: value.id,
+            tags: value.tags,
+            stars: value.stars,
+            title: value.title,
+            slug: value.slug,
+            content: value.content,
+            media: value.media,
+            created_at: value.created_at,
+            edited: value.edited,
+            edited_at: value.edited_at,
+            forum_id: value.forum_id,
+            poster_id: value.poster_id,
+        }
+    }
 }
 
 #[ComplexObject]

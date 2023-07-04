@@ -5,7 +5,7 @@ use async_graphql::{Context, Object, Result};
 
 use crate::{
     db::{
-        models::{post::Post, user::User},
+        models::{user::User, post::PostWithoutUser},
         pool::PostgresPool,
     },
     info::VersionInfo,
@@ -35,13 +35,16 @@ impl Query {
         ctx: &Context<'c>,
         forum: i32,
         order: post::PostOrder,
-    ) -> Result<Vec<Post>> {
+    ) -> Result<Vec<post::PostWithUser>> {
         let mut conn = ctx.data::<PostgresPool>()?.get()?;
 
         let posts =
             actix_rt::task::spawn_blocking(move || post::get_posts(forum, &order, &mut conn))
                 .await??;
 
-        Ok(posts)
+        Ok(posts
+            .into_iter()
+            .map(|(post, poster)| post::PostWithUser { post: PostWithoutUser::from(post), poster })
+            .collect::<Vec<_>>())
     }
 }

@@ -163,17 +163,18 @@ impl Mutation {
     async fn create_forum<'c>(
         &self,
         ctx: &Context<'c>,
-        name: String,
-        description: String,
+        display_name: String,
+        name: Option<String>,
+        description: Option<String>,
     ) -> Result<Forum> {
-        let slugged_name = slug::slugify(name.clone());
         let session = ctx.data::<SharedSession>()?;
 
         if session.get::<String>("username")?.is_some() {
+            let name = name.unwrap_or_else(|| slug::slugify(display_name.clone()));
             let owner_id = session.get::<i32>("id")?.unwrap();
             let mut conn = ctx.data::<PostgresPool>()?.get()?;
             let x = actix_rt::task::spawn_blocking(move || {
-                forum::create_forum(owner_id, slugged_name, name, description, &mut conn)
+                forum::create_forum(owner_id, name, display_name, description, &mut conn)
             })
             .await??;
             return Ok(x);

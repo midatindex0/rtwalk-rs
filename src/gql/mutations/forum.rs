@@ -11,13 +11,13 @@ pub fn create_forum<'a>(
     _owner_id: i32,
     _forum_name: String,
     _display_name: String,
-    _description: String,
+    _description: Option<String>,
     conn: &mut Conn,
 ) -> Result<Forum, ForumCreationError<'a>> {
     let new_forum = NewForum {
         name: &_forum_name,
         display_name: &_display_name,
-        description: Some(&_description),
+        description: _description.as_deref(),
         owner_id: _owner_id,
     };
     match insert_into(forums)

@@ -14,15 +14,18 @@ pub fn create_user(
     _username: String,
     _password: String,
     conn: &mut Conn,
-) -> Result<usize, UserCreationError> {
+) -> Result<User, UserCreationError> {
     let new_user = NewUser {
         username: &_username,
         password: &_password,
         display_name: &_username,
         bio: None,
     };
-    match insert_into(users).values(&new_user).execute(conn) {
-        Ok(_id) => Ok(_id),
+    match insert_into(users)
+        .values(&new_user)
+        .get_result::<User>(conn)
+    {
+        Ok(_user) => Ok(_user),
         Err(err) => match err {
             diesel::result::Error::DatabaseError(kind, info) => match kind {
                 diesel::result::DatabaseErrorKind::UniqueViolation => Err(

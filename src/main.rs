@@ -12,6 +12,7 @@ pub mod helpers;
 mod info;
 mod media;
 pub mod schema;
+pub mod search;
 
 use actix_session::{storage::RedisActorSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, middleware, web, App, HttpServer};
@@ -24,6 +25,8 @@ use opendal::{
 };
 
 use std::env;
+
+use crate::search::SearchIndex;
 
 use self::db::pool;
 use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
@@ -54,11 +57,13 @@ async fn main() -> std::io::Result<()> {
         .layer(LoggingLayer::default())
         .layer(RetryLayer::new())
         .finish();
+    let index = SearchIndex::default();
 
     let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool.clone())
         .data(hasher.clone())
         .data(data.clone())
+        .data(index)
         .data(version)
         .finish();
 

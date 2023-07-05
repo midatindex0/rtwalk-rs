@@ -1,13 +1,15 @@
 use async_graphql::{ComplexObject, Context, InputObject, SimpleObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use tantivy::{doc, Document};
 
 use crate::db::models::{forum::Forum, user::User};
 
 use crate::db::pool::PostgresPool;
 use crate::schema::{forums, posts, users};
+use crate::search::ToDoc;
 
-#[derive(Queryable, Selectable, Insertable, Debug, Associations, SimpleObject)]
+#[derive(Clone, Queryable, Selectable, Debug, Associations, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=poster_id))]
 #[diesel(belongs_to(Forum, foreign_key=forum_id))]
 #[diesel(table_name=posts)]
@@ -41,8 +43,6 @@ pub struct PostWithoutUser {
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
     pub forum_id: i32,
-    #[graphql(skip)]
-    pub poster_id: i32,
 }
 
 impl From<Post> for PostWithoutUser {
@@ -59,7 +59,6 @@ impl From<Post> for PostWithoutUser {
             edited: value.edited,
             edited_at: value.edited_at,
             forum_id: value.forum_id,
-            poster_id: value.poster_id,
         }
     }
 }
@@ -107,4 +106,38 @@ pub struct InputPost {
     #[graphql(default)]
     pub media: Option<Vec<String>>,
     pub forum: i32,
+}
+
+#[derive(Debug)]
+pub struct SearchPost {
+    pub id: i32,
+    pub tags: Option<Vec<Option<String>>>,
+    pub title: String,
+    pub content: Option<String>,
+}
+
+impl ToDoc for SearchPost {
+    fn to_doc(self, schema: &tantivy::schema::Schema) -> anyhow::Result<Document> {
+        let id = schema.get_field("id")?;
+        let tags = schema.get_field("tags")?;
+        let title = schema.get_field("title")?;
+        let content = schema.get_field("content")?;
+        Ok(doc!(
+            id => self.id as i64,
+            tags => self.tags.unwrap_or(vec![]).into_iter().filter_map(|x| x).collect::<Vec::<_>>().join(" "),
+            title => self.title,
+            content => self.content.unwrap_or(String::from("")),
+        ))
+    }
+}
+
+impl Into<SearchPost> for Post {
+    fn into(self) -> SearchPost {
+        SearchPost {
+            id: self.id,
+            tags: self.tags,
+            title: self.title,
+            content: self.content,
+        }
+    }
 }

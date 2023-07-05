@@ -7,7 +7,7 @@ use crate::schema::posts::dsl::*;
 use crate::schema::users;
 
 #[derive(OneofObject)]
-pub enum PostOrder {
+pub enum PostCriteria {
     Limit(#[graphql(validator(min = 0, max = 100))] i64),
     IdFrom(#[graphql(validator(min = 1))] i32),
     IdTill(#[graphql(validator(min = 1))] i32),
@@ -30,18 +30,18 @@ pub struct PostWithUser {
 
 pub fn get_posts(
     _forum_id: i32,
-    order: &PostOrder,
+    order: &PostCriteria,
     conn: &mut crate::Conn,
 ) -> anyhow::Result<Vec<(Post, User)>> {
     let _posts: Vec<(Post, User)> = match *order {
-        PostOrder::Limit(x) => posts
+        PostCriteria::Limit(x) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .order(created_at.desc())
             .limit(x)
             .select((Post::as_select(), User::as_select()))
             .load(conn)?,
-        PostOrder::IdFrom(x) => posts
+        PostCriteria::IdFrom(x) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .filter(id.ge(x))
@@ -49,7 +49,7 @@ pub fn get_posts(
             .limit(100)
             .select((Post::as_select(), User::as_select()))
             .load(conn)?,
-        PostOrder::IdTill(x) => posts
+        PostCriteria::IdTill(x) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .filter(id.le(x))
@@ -57,7 +57,7 @@ pub fn get_posts(
             .limit(100)
             .select((Post::as_select(), User::as_select()))
             .load(conn)?,
-        PostOrder::IdRange(IdRange { start, end }) => posts
+        PostCriteria::IdRange(IdRange { start, end }) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .filter(id.ge(start))
@@ -66,7 +66,7 @@ pub fn get_posts(
             .limit(100)
             .select((Post::as_select(), User::as_select()))
             .load(conn)?,
-        PostOrder::Before(x) => posts
+        PostCriteria::Before(x) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .filter(created_at.le(x))
@@ -74,7 +74,7 @@ pub fn get_posts(
             .limit(100)
             .select((Post::as_select(), User::as_select()))
             .load(conn)?,
-        PostOrder::After(x) => posts
+        PostCriteria::After(x) => posts
             .inner_join(users::table)
             .filter(forum_id.eq(forum_id))
             .filter(created_at.ge(x))

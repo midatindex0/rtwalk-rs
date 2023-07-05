@@ -14,10 +14,12 @@ use crate::{
     auth::SharedSession,
     constants,
     db::models::{
-        forum::Forum,
-        post::{InputPost, Post},
+        forum::{Forum, SearchForum},
+        post::{InputPost, Post, SearchPost},
+        user::SearchUser,
     },
     error::UserAuthError,
+    search::SearchIndex,
 };
 use crate::{
     db::models::File,
@@ -69,19 +71,23 @@ impl Mutation {
             .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?
             .to_string();
 
-        actix_rt::task::spawn_blocking(move || {
-            user::create_user(username, hashed_pass, &mut conn)
-                .map(|_| true)
-                .map_err(|e| {
-                    e.extend_with(|err, e| match err {
-                        UserCreationError::UsernameAlreadyExists(_) => e.set("code", "409"),
-                        UserCreationError::InternalError(_) => e.set("code", "500"),
-                        _ => unreachable!(),
-                    })
+        let created_user = actix_rt::task::spawn_blocking(move || {
+            user::create_user(username, hashed_pass, &mut conn).map_err(|e| {
+                e.extend_with(|err, e| match err {
+                    UserCreationError::UsernameAlreadyExists(_) => e.set("code", "409"),
+                    UserCreationError::InternalError(_) => e.set("code", "500"),
+                    _ => unreachable!(),
                 })
+            })
         })
         .await
-        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?
+        .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))??;
+
+        let index = ctx.data::<SearchIndex>()?;
+        let search_user: SearchUser = created_user.into();
+        index.user.add(search_user)?;
+
+        Ok(true)
     }
 
     async fn login<'c>(
@@ -177,6 +183,11 @@ impl Mutation {
                 forum::create_forum(owner_id, name, display_name, description, &mut conn)
             })
             .await??;
+
+            let index = ctx.data::<SearchIndex>()?;
+            let search_forum: SearchForum = x.clone().into();
+            index.forum.add(search_forum)?;
+
             return Ok(x);
         }
         Err(
@@ -209,6 +220,11 @@ impl Mutation {
                 )
             })
             .await??;
+
+            let index = ctx.data::<SearchIndex>()?;
+            let search_post: SearchPost = x.clone().into();
+            index.post.add(search_post)?;
+
             return Ok(x);
         }
         Err(

@@ -1,12 +1,14 @@
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use tantivy::{doc, Document};
 
 use crate::db::models::user::User;
 use crate::db::pool::PostgresPool;
 use crate::schema::{forums, users};
+use crate::search::ToDoc;
 
-#[derive(Queryable, Selectable, Insertable, Debug, Associations, SimpleObject)]
+#[derive(Clone, Queryable, Selectable, Insertable, Debug, Associations, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=owner_id))]
 #[diesel(table_name=forums)]
 #[graphql(complex)]
@@ -42,4 +44,38 @@ pub struct NewForum<'a> {
     pub display_name: &'a str,
     pub description: Option<&'a str>,
     pub owner_id: i32,
+}
+
+#[derive(Debug)]
+pub struct SearchForum {
+    pub id: i32,
+    pub name: String,
+    pub display_name: String,
+    pub decsription: Option<String>,
+}
+
+impl ToDoc for SearchForum {
+    fn to_doc(self, schema: &tantivy::schema::Schema) -> anyhow::Result<Document> {
+        let id = schema.get_field("id")?;
+        let name = schema.get_field("name")?;
+        let display_name = schema.get_field("display_name")?;
+        let description = schema.get_field("description")?;
+        Ok(doc!(
+            id => self.id as i64,
+            name => self.name,
+            display_name => self.display_name,
+            description => self.decsription.unwrap_or(String::from("")),
+        ))
+    }
+}
+
+impl From<Forum> for SearchForum {
+    fn from(value: Forum) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            display_name: value.display_name,
+            decsription: value.description,
+        }
+    }
 }

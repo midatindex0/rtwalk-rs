@@ -1,18 +1,20 @@
 use crate::{
     db::{models::File, pool::PostgresPool},
     schema::{forums, users},
+    search::ToDoc,
 };
 
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use diesel::{Identifiable, Insertable, Queryable, Selectable};
+use diesel::{Insertable, Queryable, Selectable};
+use tantivy::{doc, Document};
 
 use super::forum::Forum;
 
 /// Represents a user in the db.
 /// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Debug, Queryable, Selectable, Identifiable, SimpleObject)]
+#[derive(Debug, Queryable, Selectable, SimpleObject)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[graphql(complex)]
@@ -51,4 +53,38 @@ pub struct NewUser<'a> {
     pub password: &'a str,
     pub display_name: &'a str,
     pub bio: Option<&'a str>,
+}
+
+#[derive(Debug)]
+pub struct SearchUser {
+    pub id: i32,
+    pub username: String,
+    pub display_name: String,
+    pub bio: Option<String>,
+}
+
+impl ToDoc for SearchUser {
+    fn to_doc(self, schema: &tantivy::schema::Schema) -> anyhow::Result<Document> {
+        let id = schema.get_field("id")?;
+        let username = schema.get_field("username")?;
+        let display_name = schema.get_field("display_name")?;
+        let bio = schema.get_field("bio")?;
+        Ok(doc!(
+            id => self.id as i64,
+            username => self.username,
+            display_name => self.display_name,
+            bio => self.bio.unwrap_or(String::from("")),
+        ))
+    }
+}
+
+impl From<User> for SearchUser {
+    fn from(value: User) -> Self {
+        Self {
+            id: value.id,
+            username: value.username,
+            display_name: value.display_name,
+            bio: value.bio,
+        }
+    }
 }

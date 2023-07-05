@@ -29,3 +29,4 @@ actix-session = { version = "0.7.2", features = ["redis-actor-session"] }
 send_wrapper = "0.6.0"
 slug = "0.1.4"
 rand = "0.8.5"
+tantivy = "0.20.2"

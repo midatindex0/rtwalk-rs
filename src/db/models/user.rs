@@ -19,7 +19,6 @@ use super::forum::Forum;
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[graphql(complex)]
 pub struct User {
-    #[graphql(skip)]
     pub id: i32,
     pub username: String,
     #[graphql(skip)]

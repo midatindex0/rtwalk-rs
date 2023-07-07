@@ -26,12 +26,11 @@ pub struct Post {
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
     pub forum_id: i32,
-    #[graphql(skip)]
     pub poster_id: i32,
 }
 
 #[derive(SimpleObject)]
-pub struct PostWithoutUser {
+pub struct RawPost {
     pub id: i32,
     pub tags: Option<Vec<Option<String>>>,
     pub stars: i32,
@@ -43,9 +42,10 @@ pub struct PostWithoutUser {
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
     pub forum_id: i32,
+    pub poster_id: i32,
 }
 
-impl From<Post> for PostWithoutUser {
+impl From<Post> for RawPost {
     fn from(value: Post) -> Self {
         Self {
             id: value.id,
@@ -59,6 +59,7 @@ impl From<Post> for PostWithoutUser {
             edited: value.edited,
             edited_at: value.edited_at,
             forum_id: value.forum_id,
+            poster_id: value.poster_id,
         }
     }
 }

@@ -4,5 +4,8 @@
 !.env.example
 data/**
 !data/data.txt
+/venv
+tests/**/__pycache__
+tests/
 
 todo.md

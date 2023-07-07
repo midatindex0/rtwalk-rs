@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
@@ -10,6 +11,21 @@ use tantivy::{Index, IndexReader, IndexWriter};
 
 #[allow(missing_debug_implementations)]
 pub struct IndexOp(Mutex<IndexWriter>, IndexReader, Index);
+
+#[derive(Debug)]
+pub struct SearchResults {
+    inner: HashMap<i32, f32>,
+}
+
+impl SearchResults {
+    pub fn ids(&self) -> Vec<i32> {
+        self.inner.keys().copied().collect()
+    }
+
+    pub fn map_id_score(&self, id: i32) -> Option<f32> {
+        self.inner.get(&id).copied()
+    }
+}
 
 pub trait ToDoc {
     fn to_doc(self, schema: &Schema) -> anyhow::Result<Document>;
@@ -24,7 +40,12 @@ impl IndexOp {
         )
     }
 
-    pub fn search(&self, query: &str, offset: usize) -> anyhow::Result<Vec<(i32, f32)>> {
+    pub fn search(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+    ) -> anyhow::Result<SearchResults> {
         let searcher = self.1.searcher();
         let mut default_fields = vec![];
         let schema = self.2.schema();
@@ -32,25 +53,27 @@ impl IndexOp {
         for (field, _) in schema.fields() {
             default_fields.push(field);
         }
+        default_fields.retain(|x| *x != id);
         let parser = QueryParser::for_index(&self.2, default_fields);
         let query = parser.parse_query(query)?;
-        let results = searcher.search(&query, &TopDocs::with_limit(50).and_offset(offset))?;
-        let mut scored_id = vec![];
+        let results = searcher.search(&query, &TopDocs::with_limit(limit).and_offset(offset))?;
+        let mut scored_id = HashMap::new();
         for (score, add) in results {
             let document = searcher.doc(add)?;
-            scored_id.push((
+            scored_id.insert(
                 document.get_first(id).unwrap().to_owned().as_i64().unwrap() as i32,
                 score,
-            ));
+            );
         }
-        Ok(scored_id)
+        Ok(SearchResults { inner: scored_id })
     }
 
     pub fn add<T: ToDoc>(&self, document: T) -> anyhow::Result<()> {
-        let writer = self.0.lock().unwrap();
+        let mut writer = self.0.lock().unwrap();
         let schema = self.2.schema();
         let to_insert = document.to_doc(&schema)?;
         writer.add_document(to_insert)?;
+        writer.commit()?;
         Ok(())
     }
 }

@@ -67,7 +67,7 @@ async fn main() -> std::io::Result<()> {
         .data(version)
         .finish();
 
-    log::info!("Running server at http://127.0.0.1:8000/graphiql");
+    println!("Running server at http://127.0.0.1:8000/graphiql");
 
     HttpServer::new(move || {
         App::new()

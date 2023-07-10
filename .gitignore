@@ -8,4 +8,5 @@ data/**
 tests/**/__pycache__
 tests/
 
+resetindex.sh
 todo.md

@@ -1,14 +1,50 @@
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use async_graphql::InputObject;
 use diesel::prelude::*;
 use diesel::{insert_into, RunQueryDsl};
 use log;
 
-use crate::db::models::user::NewUser;
 use crate::db::models::user::User;
+use crate::db::models::user::{NewUser, UpdateUser};
+use crate::db::models::File;
 use crate::error::{UserAuthError, UserCreationError};
 use crate::schema::users::dsl::*;
 
 type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
+
+#[derive(InputObject)]
+pub struct BasicUserUpdate {
+    pub _display_name: Option<String>,
+    pub _bio: Option<String>,
+    pub _pfp: Option<String>,
+    pub _banner: Option<String>,
+}
+
+impl Into<UpdateUser> for BasicUserUpdate {
+    fn into(self) -> UpdateUser {
+        UpdateUser {
+            id: 0,
+            username: None,
+            password: None,
+            display_name: self._display_name,
+            bio: self._bio.map(|x| if x.is_empty() { None } else { Some(x) }),
+            pfp: self._pfp.map(|x| {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(File::new(x))
+                }
+            }),
+            banner: self._banner.map(|x| {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(File::new(x))
+                }
+            }),
+        }
+    }
+}
 
 pub fn create_user(
     _username: String,
@@ -46,6 +82,13 @@ pub fn create_user(
             }
         },
     }
+}
+
+pub fn update_user(changes: &UpdateUser, conn: &mut Conn) -> anyhow::Result<User> {
+    let x = diesel::update(users)
+        .set(changes)
+        .get_result::<User>(conn)?;
+    Ok(x)
 }
 
 pub fn verify_user<'a>(

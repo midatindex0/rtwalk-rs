@@ -29,7 +29,20 @@ pub struct User {
     pub banner: Option<File>,
     pub created_at: NaiveDateTime,
     #[graphql(skip)]
+    // Not currently in use
     pub v: i32,
+}
+
+#[derive(AsChangeset, Debug)]
+#[diesel(table_name = users)]
+pub struct UpdateUser {
+    pub id: i32,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub display_name: Option<String>,
+    pub bio: Option<Option<String>>,
+    pub pfp: Option<Option<File>>,
+    pub banner: Option<Option<File>>,
 }
 
 #[ComplexObject]

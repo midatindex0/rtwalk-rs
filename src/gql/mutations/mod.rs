@@ -16,11 +16,12 @@ use crate::{
     db::models::{
         forum::{Forum, SearchForum},
         post::{InputPost, Post, SearchPost},
-        user::SearchUser,
+        user::{SearchUser, UpdateUser},
     },
     error::UserAuthError,
     search::SearchIndex,
 };
+use crate::{db::models::user::User, spawn_blocking};
 use crate::{
     db::models::File,
     helpers::{calculate_password_strength, check_reserved_username},
@@ -88,6 +89,29 @@ impl Mutation {
         index.user.add(search_user)?;
 
         Ok(true)
+    }
+
+    async fn update_user_basic<'c>(
+        &self,
+        ctx: &Context<'c>,
+        changes: user::BasicUserUpdate,
+    ) -> Result<User> {
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+        let session = ctx.data::<SharedSession>()?;
+        let id = session.get::<i32>("id")?;
+
+        if let Some(id) = id {
+            let mut changes: UpdateUser = changes.into();   
+            changes.id = id;
+            let user = spawn_blocking!(
+                user::update_user(&changes, &mut conn)
+            )??;
+            return Ok(user);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
     }
 
     async fn login<'c>(
@@ -179,10 +203,13 @@ impl Mutation {
             let name = name.unwrap_or_else(|| slug::slugify(display_name.clone()));
             let owner_id = session.get::<i32>("id")?.unwrap();
             let mut conn = ctx.data::<PostgresPool>()?.get()?;
-            let x = actix_rt::task::spawn_blocking(move || {
-                forum::create_forum(owner_id, name, display_name, description, &mut conn)
-            })
-            .await??;
+            let x = spawn_blocking!(forum::create_forum(
+                owner_id,
+                name,
+                display_name,
+                description,
+                &mut conn
+            ))??;
 
             let index = ctx.data::<SearchIndex>()?;
             let search_forum: SearchForum = x.clone().into();
@@ -207,19 +234,16 @@ impl Mutation {
         if session.get::<String>("username")?.is_some() {
             let poster_id = session.get::<i32>("id")?.unwrap();
             let mut conn = ctx.data::<PostgresPool>()?.get()?;
-            let x = actix_rt::task::spawn_blocking(move || {
-                post::create_post(
-                    input_post.tags,
-                    input_post.title,
-                    slug,
-                    input_post.content,
-                    input_post.media,
-                    input_post.forum,
-                    poster_id,
-                    &mut conn,
-                )
-            })
-            .await??;
+            let x = spawn_blocking!(post::create_post(
+                input_post.tags,
+                input_post.title,
+                slug,
+                input_post.content,
+                input_post.media,
+                input_post.forum,
+                poster_id,
+                &mut conn,
+            ))??;
 
             let index = ctx.data::<SearchIndex>()?;
             let search_post: SearchPost = x.clone().into();

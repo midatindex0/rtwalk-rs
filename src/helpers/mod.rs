@@ -1,3 +1,10 @@
+#[macro_export]
+macro_rules! spawn_blocking {
+    ($val:expr) => {
+        actix_rt::task::spawn_blocking(move || $val).await
+    };
+}
+
 pub fn calculate_password_strength(_password: &str) -> i32 {
     let mut uppercase = 0;
     let mut lowercase = 0;

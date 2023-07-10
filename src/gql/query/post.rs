@@ -48,6 +48,8 @@ pub struct MultiPostReturn {
     pub post: RawPost,
     pub poster: User,
     pub forum: Forum,
+    // TODO:
+    // pub participants: Vec<User>,
     pub score: Option<f32>,
 }
 
@@ -88,8 +90,71 @@ pub fn get_posts(
                 .collect();
             _posts
         }
-        _ => {
-            todo!("post criteria")
+        PostCriteria::BySlugs(slugs) => {
+            let _posts: Vec<(Post, User, Forum)> = posts
+                .inner_join(users::table)
+                .inner_join(forums::table)
+                .filter(slug.eq_any(slugs))
+                .filter(stars.gt(filter.star.gt))
+                .offset(filter.page.offset() as i64)
+                .limit(filter.page.per as i64)
+                .select((Post::as_select(), User::as_select(), Forum::as_select()))
+                .load(conn)?;
+
+            let _posts = _posts
+                .into_iter()
+                .map(|x| MultiPostReturn {
+                    score: None,
+                    post: RawPost::from(x.0),
+                    poster: x.1,
+                    forum: x.2,
+                })
+                .collect();
+            _posts
+        }
+        PostCriteria::ByIds(ids) => {
+            let _posts: Vec<(Post, User, Forum)> = posts
+                .inner_join(users::table)
+                .inner_join(forums::table)
+                .filter(id.eq_any(ids))
+                .filter(stars.gt(filter.star.gt))
+                .offset(filter.page.offset() as i64)
+                .limit(filter.page.per as i64)
+                .select((Post::as_select(), User::as_select(), Forum::as_select()))
+                .load(conn)?;
+
+            let _posts = _posts
+                .into_iter()
+                .map(|x| MultiPostReturn {
+                    score: None,
+                    post: RawPost::from(x.0),
+                    poster: x.1,
+                    forum: x.2,
+                })
+                .collect();
+            _posts
+        }
+        PostCriteria::ByForumId(fid) => {
+            let _posts: Vec<(Post, User, Forum)> = posts
+                .inner_join(users::table)
+                .inner_join(forums::table)
+                .filter(forum_id.eq(fid))
+                .filter(stars.gt(filter.star.gt))
+                .offset(filter.page.offset() as i64)
+                .limit(filter.page.per as i64)
+                .select((Post::as_select(), User::as_select(), Forum::as_select()))
+                .load(conn)?;
+
+            let _posts = _posts
+                .into_iter()
+                .map(|x| MultiPostReturn {
+                    score: None,
+                    post: RawPost::from(x.0),
+                    poster: x.1,
+                    forum: x.2,
+                })
+                .collect();
+            _posts
         }
     };
     Ok(_posts)

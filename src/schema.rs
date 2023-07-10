@@ -14,6 +14,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    messages (id) {
+        id -> Int4,
+        user_id -> Int4,
+        post_id -> Int4,
+        content -> Text,
+        media -> Nullable<Array<Nullable<Text>>>,
+        created_at -> Timestamp,
+        edited -> Bool,
+        edited_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
     posts (id) {
         id -> Int4,
         tags -> Nullable<Array<Nullable<Text>>>,
@@ -45,11 +58,14 @@ diesel::table! {
 }
 
 diesel::joinable!(forums -> users (owner_id));
+diesel::joinable!(messages -> posts (post_id));
+diesel::joinable!(messages -> users (user_id));
 diesel::joinable!(posts -> forums (forum_id));
 diesel::joinable!(posts -> users (poster_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     forums,
+    messages,
     posts,
     users,
 );

@@ -10,7 +10,6 @@ mod gql;
 mod handlers;
 pub mod helpers;
 mod info;
-mod media;
 pub mod schema;
 pub mod search;
 
@@ -77,14 +76,11 @@ async fn main() -> std::io::Result<()> {
             .service(gql_handler)
             .service(gql_playground_handler)
             .service(
-                web::scope("/media")
-                    .service(media::pfp)
-                    // TODO: Probably remove
-                    .service(
-                        actix_files::Files::new("/", "data/")
-                            .show_files_listing()
-                            .use_last_modified(true),
-                    ),
+                web::scope("/cdn").service(
+                    actix_files::Files::new("/", "data/")
+                        .show_files_listing()
+                        .use_last_modified(true),
+                ),
             )
             .wrap(SessionMiddleware::new(
                 RedisActorSessionStore::new(redis_url.clone()),

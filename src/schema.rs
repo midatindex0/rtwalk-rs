@@ -18,6 +18,7 @@ diesel::table! {
         id -> Int4,
         user_id -> Int4,
         post_id -> Int4,
+        parent_id -> Nullable<Int4>,
         content -> Text,
         media -> Nullable<Array<Nullable<Text>>>,
         created_at -> Timestamp,

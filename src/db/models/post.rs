@@ -9,7 +9,7 @@ use crate::db::pool::PostgresPool;
 use crate::schema::{forums, posts, users};
 use crate::search::ToDoc;
 
-#[derive(Clone, Queryable, Selectable, Debug, Associations, SimpleObject)]
+#[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=poster_id))]
 #[diesel(belongs_to(Forum, foreign_key=forum_id))]
 #[diesel(table_name=posts)]

@@ -6,7 +6,7 @@ use opendal::Operator;
 
 use std::io::prelude::*;
 
-#[derive(AsExpression, FromSqlRow, Debug, SimpleObject)]
+#[derive(AsExpression, FromSqlRow, Debug, Clone, SimpleObject)]
 #[diesel(sql_type = VarChar)]
 pub struct File {
     id: String,

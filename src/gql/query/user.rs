@@ -28,6 +28,7 @@ impl From<Option<UserFilter>> for RawUserFilter {
 pub enum UserCriteria {
     Search(String),
     ByUsernames(Vec<String>),
+    ByIds(Vec<i32>),
 }
 
 pub fn get_users(
@@ -48,6 +49,11 @@ pub fn get_users(
         }
         UserCriteria::ByUsernames(usernames) => users
             .filter(username.eq_any(usernames))
+            .offset(filter.page.offset() as i64)
+            .limit(filter.page.per as i64)
+            .load::<User>(conn)?,
+        UserCriteria::ByIds(ids) => users
+            .filter(id.eq_any(ids))
             .offset(filter.page.offset() as i64)
             .limit(filter.page.per as i64)
             .load::<User>(conn)?,

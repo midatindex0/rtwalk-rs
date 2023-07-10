@@ -11,7 +11,7 @@ use crate::search::SearchIndex;
 
 #[derive(InputObject, Default)]
 struct StarFilter {
-    gt: usize,
+    gt: i32,
 }
 
 #[derive(InputObject, Default)]
@@ -43,22 +43,6 @@ pub enum PostCriteria {
     ByForumId(i32),
 }
 
-// #[derive(OneofObject)]
-// pub enum PostCriteria {
-//     Limit(#[graphql(validator(min = 0, max = 100))] i64),
-//     IdFrom(#[graphql(validator(min = 1))] i32),
-//     IdTill(#[graphql(validator(min = 1))] i32),
-//     IdRange(IdRange),
-//     Before(chrono::NaiveDateTime),
-//     After(chrono::NaiveDateTime),
-// }
-
-// #[derive(InputObject)]
-// pub struct IdRange {
-//     start: i32,
-//     end: i32,
-// }
-
 #[derive(SimpleObject)]
 pub struct MultiPostReturn {
     pub post: RawPost,
@@ -87,6 +71,7 @@ pub fn get_posts(
                 .inner_join(users::table)
                 .inner_join(forums::table)
                 .filter(id.eq_any(ids))
+                .filter(stars.gt(filter.star.gt))
                 .offset(filter.page.offset() as i64)
                 .limit(filter.page.per as i64)
                 .select((Post::as_select(), User::as_select(), Forum::as_select()))

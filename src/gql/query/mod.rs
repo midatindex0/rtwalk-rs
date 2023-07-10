@@ -9,7 +9,7 @@ use async_graphql::{Context, InputObject, Object, Result};
 
 use crate::{
     db::{
-        models::{forum::Forum, user::User},
+        models::{user::User},
         pool::PostgresPool,
     },
     info::VersionInfo,
@@ -77,7 +77,7 @@ impl Query {
         ctx: &Context<'c>,
         filter: Option<ForumFilter>,
         criteria: ForumCriteria,
-    ) -> Result<Vec<Forum>> {
+    ) -> Result<Vec<forum::MultiForumReturn>> {
         let mut conn = ctx.data::<PostgresPool>()?.get()?;
         let index = ctx.data::<SearchIndex>()?.clone();
 

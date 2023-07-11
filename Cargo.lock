@@ -837,6 +837,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
@@ -2808,10 +2809,13 @@ dependencies = [
 name = "rtwalk"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "actix-files",
+ "actix-redis",
  "actix-rt",
  "actix-session",
  "actix-web",
+ "actix-web-actors",
  "actix-web-lab",
  "anyhow",
  "argon2",

@@ -2,7 +2,10 @@ use async_graphql::{InputObject, OneofObject};
 use diesel::prelude::*;
 
 use crate::db::models::comment::{Comment, CommentHierarchy};
+use crate::db::models::user::User;
 use crate::schema::comments::dsl::*;
+use crate::schema::users;
+use crate::search::SearchIndex;
 
 use super::Page;
 
@@ -33,21 +36,27 @@ pub enum CommentCriteria {
     ByPostId(i32),
 }
 
-fn get_comments(
+pub fn get_comments(
     filter: Option<CommentFilter>,
     criteria: CommentCriteria,
+    _index: &SearchIndex,
     conn: &mut crate::Conn,
 ) -> anyhow::Result<Vec<CommentHierarchy>> {
     let filter: RawCommentFilter = filter.into();
     let _comments: Vec<CommentHierarchy> = match criteria {
-        CommentCriteria::Search(_) => todo!(),
+        CommentCriteria::Search(_) => {
+            return Err(anyhow::Error::msg("Not supported yet"));
+        }
         CommentCriteria::ByPostId(_post_id) => {
-            let _comments: Vec<Comment> = comments
+            let _comments: Vec<(Comment, User)> = comments
+                .inner_join(users::table)
                 .filter(post_id.eq(_post_id))
+                .offset(filter.page.offset())
+                .limit(filter.page.per)
                 .filter(parent_id.eq(filter._parent_id))
-                .load::<Comment>(conn)?;
+                .load::<(Comment, User)>(conn)?;
 
-        CommentHierarchy::load_hierarchy(&_comments, filter._parent_id)
+            CommentHierarchy::load_hierarchy(&_comments, filter._parent_id)
         }
     };
 

@@ -8,13 +8,14 @@ use async_graphql::{ComplexObject, Context, SimpleObject};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::{Insertable, Queryable, Selectable};
+use serde::{Deserialize, Serialize};
 use tantivy::{doc, Document};
 
 use super::forum::Forum;
 
 /// Represents a user in the db.
 /// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Debug, Queryable, Selectable, SimpleObject)]
+#[derive(Clone, Debug, Queryable, Selectable, SimpleObject, Deserialize, Serialize)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[graphql(complex)]

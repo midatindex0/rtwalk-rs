@@ -15,13 +15,13 @@ r2d2 = "0.8.10"
 env_logger = "0.10.0"
 anyhow = "1.0.71"
 actix-rt = "2.8.0"
-chrono = "0.4.26"
+chrono = { version = "0.4.26", features = ["serde"] }
 argon2 = "0.5.0"
 async-graphql = { version = "5.0.10", features = ["chrono"] }
 async-graphql-actix-web = "5.0.10"
 log = "0.4.19"
 actix-web-lab = "0.19.1"
-opendal = { version = "0.37.0", features = ["layers-all", "services-fs"]}
+opendal = { version = "0.37.0", features = ["layers-all", "services-fs"] }
 thiserror = "1.0.40"
 actix-files = "0.6.2"
 uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
@@ -30,3 +30,6 @@ send_wrapper = "0.6.0"
 slug = "0.1.4"
 rand = "0.8.5"
 tantivy = "0.20.2"
+actix = "0.13.0"
+actix-web-actors = "4.2.0"
+actix-redis = "0.12.0"

@@ -64,7 +64,7 @@ pub fn get_forums(
             let result =
                 index
                     .forum
-                    .search(&query, filter.page.offset(), filter.page.per as usize)?;
+                    .search(&query, filter.page.offset() as usize, filter.page.per as usize)?;
             let ids = result.ids();
 
             // TODO: Join owner

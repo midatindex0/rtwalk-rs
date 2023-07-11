@@ -3,10 +3,11 @@ use diesel::{
     backend::Backend, deserialize, serialize, sql_types::VarChar, AsExpression, FromSqlRow,
 };
 use opendal::Operator;
+use serde::{Deserialize, Serialize};
 
 use std::io::prelude::*;
 
-#[derive(AsExpression, FromSqlRow, Debug, Clone, SimpleObject)]
+#[derive(AsExpression, FromSqlRow, Debug, Clone, SimpleObject, Deserialize, Serialize)]
 #[diesel(sql_type = VarChar)]
 pub struct File {
     id: String,

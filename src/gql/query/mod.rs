@@ -1,7 +1,7 @@
+mod comment;
 mod forum;
 mod post;
 mod user;
-mod comment;
 
 use forum::{ForumCriteria, ForumFilter};
 use user::{UserCriteria, UserFilter};
@@ -10,19 +10,20 @@ use async_graphql::{Context, InputObject, Object, Result};
 
 use crate::{
     db::{
-        models::{user::User},
+        models::{comment::CommentHierarchy, user::User},
         pool::PostgresPool,
     },
     info::VersionInfo,
     search::SearchIndex,
+    spawn_blocking,
 };
 
 #[derive(InputObject)]
 pub struct Page {
     #[graphql(validator(minimum = 1))]
-    num: u32,
+    num: i64,
     #[graphql(validator(minimum = 1, maximum = 50))]
-    per: u32,
+    per: i64,
 }
 
 impl Default for Page {
@@ -32,8 +33,8 @@ impl Default for Page {
 }
 
 impl Page {
-    fn offset(&self) -> usize {
-        return ((self.num - 1) * self.per) as usize;
+    fn offset(&self) -> i64 {
+        (self.num - 1) * self.per
     }
 }
 
@@ -105,5 +106,20 @@ impl Query {
         .await??;
 
         Ok(posts)
+    }
+
+    async fn comments<'c>(
+        &self,
+        ctx: &Context<'c>,
+        filter: Option<comment::CommentFilter>,
+        criteria: comment::CommentCriteria,
+    ) -> Result<Vec<CommentHierarchy>> {
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+        let index = ctx.data::<SearchIndex>()?.clone();
+
+        let comments =
+            spawn_blocking!(comment::get_comments(filter, criteria, &index, &mut conn))??;
+
+        Ok(comments)
     }
 }

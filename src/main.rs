@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![warn(missing_debug_implementations)]
-
 pub mod auth;
 pub mod constants;
 pub mod core;
@@ -13,6 +10,7 @@ mod info;
 pub mod schema;
 pub mod search;
 
+use actix::*;
 use actix_session::{storage::RedisActorSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, middleware, web, App, HttpServer};
 use argon2::Argon2;
@@ -25,11 +23,14 @@ use opendal::{
 
 use std::env;
 
-use crate::search::SearchIndex;
+use crate::{core::RtServer, search::SearchIndex};
 
 use self::db::pool;
 use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
-use self::handlers::gql::{gql_handler, gql_playground_handler};
+use self::handlers::{
+    gql::{gql_handler, gql_playground_handler},
+    ws::connect,
+};
 
 type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
@@ -49,6 +50,7 @@ async fn main() -> std::io::Result<()> {
         bug_fix: 1,
         version_string: "0.1.0 alpha",
     };
+
     let mut fs_builder = Fs::default();
     fs_builder.root("data/").enable_path_check();
     let data = Operator::new(fs_builder)
@@ -56,7 +58,10 @@ async fn main() -> std::io::Result<()> {
         .layer(LoggingLayer::default())
         .layer(RetryLayer::new())
         .finish();
+
     let index = SearchIndex::default();
+
+    let rt_server = RtServer::default().start();
 
     let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool.clone())
@@ -66,15 +71,17 @@ async fn main() -> std::io::Result<()> {
         .data(version)
         .finish();
 
-    println!("Running server at http://127.0.0.1:8000/graphiql");
+    log::info!("Running server at http://127.0.0.1:8000/graphiql");
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(hasher.clone()))
+            .app_data(web::Data::new(rt_server.clone()))
             .service(gql_handler)
             .service(gql_playground_handler)
+            .route("/connect", web::get().to(connect))
             .service(
                 web::scope("/cdn").service(
                     actix_files::Files::new("/", "data/")
@@ -95,6 +102,5 @@ async fn main() -> std::io::Result<()> {
 }
 
 fn logging_setup() {
-    env::set_var("RUST_LOG", "actix_web=info");
-    env_logger::init();
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 }

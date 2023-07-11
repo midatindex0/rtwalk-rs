@@ -40,10 +40,11 @@ pub fn get_users(
     let filter: RawUserFilter = filter.into();
     let x: Vec<User> = match criteria {
         UserCriteria::Search(query) => {
-            let results =
-                index
-                    .user
-                    .search(&query, filter.page.offset(), filter.page.per as usize)?;
+            let results = index.user.search(
+                &query,
+                filter.page.offset() as usize,
+                filter.page.per as usize,
+            )?;
             let ids = results.ids();
             users.filter(id.eq_any(ids)).load::<User>(conn)?
         }

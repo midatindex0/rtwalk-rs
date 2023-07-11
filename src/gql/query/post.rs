@@ -65,7 +65,7 @@ pub fn get_posts(
             let result =
                 index
                     .post
-                    .search(&query, filter.page.offset(), filter.page.per as usize)?;
+                    .search(&query, filter.page.offset() as usize, filter.page.per as usize)?;
 
             let ids = result.ids();
 

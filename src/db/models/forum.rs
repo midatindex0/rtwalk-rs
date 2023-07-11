@@ -1,5 +1,6 @@
 use async_graphql::{ComplexObject, Context, SimpleObject};
 use chrono::NaiveDateTime;
+use diesel::pg::Pg;
 use diesel::prelude::*;
 use tantivy::{doc, Document};
 
@@ -11,6 +12,7 @@ use crate::search::ToDoc;
 #[derive(Clone, Queryable, Selectable, Insertable, Debug, Associations, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=owner_id))]
 #[diesel(table_name=forums)]
+#[diesel(check_for_backend(Pg))]
 #[graphql(complex)]
 pub struct Forum {
     pub id: i32,

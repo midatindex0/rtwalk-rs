@@ -1,6 +1,6 @@
 pub mod file;
 pub mod forum;
-pub mod message;
+pub mod comment;
 pub mod post;
 pub mod user;
 

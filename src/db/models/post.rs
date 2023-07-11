@@ -1,5 +1,6 @@
 use async_graphql::{ComplexObject, Context, InputObject, SimpleObject};
 use chrono::NaiveDateTime;
+use diesel::pg::Pg;
 use diesel::prelude::*;
 use tantivy::{doc, Document};
 
@@ -8,10 +9,12 @@ use crate::db::models::{forum::Forum, user::User};
 use crate::db::pool::PostgresPool;
 use crate::schema::{forums, posts, users};
 use crate::search::ToDoc;
+use super::File;
 
 #[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=poster_id))]
 #[diesel(belongs_to(Forum, foreign_key=forum_id))]
+#[diesel(check_for_backend(Pg))]
 #[diesel(table_name=posts)]
 #[graphql(complex)]
 pub struct Post {
@@ -21,7 +24,7 @@ pub struct Post {
     pub title: String,
     pub slug: String,
     pub content: Option<String>,
-    pub media: Option<Vec<Option<String>>>,
+    pub media: Option<Vec<Option<File>>>,
     pub created_at: NaiveDateTime,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
@@ -37,7 +40,7 @@ pub struct RawPost {
     pub title: String,
     pub slug: String,
     pub content: Option<String>,
-    pub media: Option<Vec<Option<String>>>,
+    pub media: Option<Vec<Option<File>>>,
     pub created_at: NaiveDateTime,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,

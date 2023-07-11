@@ -1,7 +1,7 @@
 mod comment;
 mod forum;
 mod post;
-mod user;
+pub mod user;
 
 use forum::{ForumCriteria, ForumFilter};
 use user::{UserCriteria, UserFilter};

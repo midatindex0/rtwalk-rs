@@ -81,7 +81,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(rt_server.clone()))
             .service(gql_handler)
             .service(gql_playground_handler)
-            .route("/connect", web::get().to(connect))
+            .service(connect)
             .service(
                 web::scope("/cdn").service(
                     actix_files::Files::new("/", "data/")

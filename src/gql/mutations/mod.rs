@@ -16,7 +16,7 @@ use crate::{
     constants,
     db::models::{
         forum::{Forum, SearchForum, UpdateForum},
-        post::{InputPost, Post, SearchPost},
+        post::{InputPost, Post, SearchPost, UpdatePost},
         user::{SearchUser, UpdateUser},
     },
     error::UserAuthError,
@@ -288,6 +288,32 @@ impl Mutation {
             index.post.add(search_post)?;
 
             return Ok(x);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
+    async fn update_post_basic<'c>(
+        &self,
+        ctx: &Context<'c>,
+        changes: post::BasicPostUpdate,
+    ) -> Result<Post> {
+        let session = ctx.data::<SharedSession>()?;
+        let id = session.get::<i32>("id")?;
+
+        if let Some(id) = id {
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+            let index = ctx.data::<SearchIndex>()?;
+
+            let changes: UpdatePost = changes.into();
+            let post = spawn_blocking!(post::update_post(id, &changes, &mut conn))??;
+
+            let index_update: SearchPost = post.clone().into();
+            index.post.update(index_update)?;
+
+            return Ok(post);
         }
         Err(
             async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)

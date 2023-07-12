@@ -6,10 +6,10 @@ use tantivy::{doc, Document};
 
 use crate::db::models::{forum::Forum, user::User};
 
+use super::File;
 use crate::db::pool::PostgresPool;
 use crate::schema::{forums, posts, users};
 use crate::search::ToDoc;
-use super::File;
 
 #[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=poster_id))]
@@ -30,6 +30,21 @@ pub struct Post {
     pub edited_at: Option<NaiveDateTime>,
     pub forum_id: i32,
     pub poster_id: i32,
+}
+
+#[derive(AsChangeset, Debug)]
+#[diesel(table_name = posts)]
+pub struct UpdatePost {
+    pub id: i32,
+    pub tags: Option<Option<Vec<Option<String>>>>,
+    pub stars: Option<i32>,
+    pub title: Option<String>,
+    pub slug: Option<String>,
+    pub content: Option<Option<String>>,
+    pub media: Option<Option<Vec<Option<File>>>>,
+    pub edited: bool,
+    pub edited_at: Option<NaiveDateTime>,
+    pub poster_id: Option<i32>,
 }
 
 #[derive(SimpleObject)]

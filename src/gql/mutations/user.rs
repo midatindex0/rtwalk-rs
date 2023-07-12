@@ -10,8 +10,6 @@ use crate::db::models::File;
 use crate::error::{UserAuthError, UserCreationError};
 use crate::schema::users::dsl::*;
 
-type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
-
 #[derive(InputObject)]
 pub struct BasicUserUpdate {
     pub _display_name: Option<String>,
@@ -49,7 +47,7 @@ impl Into<UpdateUser> for BasicUserUpdate {
 pub fn create_user(
     _username: String,
     _password: String,
-    conn: &mut Conn,
+    conn: &mut crate::Conn,
 ) -> Result<User, UserCreationError> {
     let new_user = NewUser {
         username: &_username,
@@ -84,7 +82,7 @@ pub fn create_user(
     }
 }
 
-pub fn update_user(changes: &UpdateUser, conn: &mut Conn) -> anyhow::Result<User> {
+pub fn update_user(changes: &UpdateUser, conn: &mut crate::Conn) -> anyhow::Result<User> {
     let x = diesel::update(users)
         .set(changes)
         .get_result::<User>(conn)?;
@@ -94,7 +92,7 @@ pub fn update_user(changes: &UpdateUser, conn: &mut Conn) -> anyhow::Result<User
 pub fn verify_user<'a>(
     _username: &str,
     _password: &str,
-    conn: &mut Conn,
+    conn: &mut crate::Conn,
     hasher: &Argon2,
 ) -> Result<(bool, i32), UserAuthError<'a>> {
     let _user = users

@@ -1,7 +1,7 @@
+pub mod comment;
 mod forum;
 mod post;
 mod user;
-pub mod comment;
 
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
@@ -15,11 +15,12 @@ use crate::{
     auth::SharedSession,
     constants,
     db::models::{
-        forum::{Forum, SearchForum},
+        forum::{Forum, SearchForum, UpdateForum},
         post::{InputPost, Post, SearchPost},
         user::{SearchUser, UpdateUser},
     },
     error::UserAuthError,
+    helpers::check_valid_uservane,
     search::SearchIndex,
 };
 use crate::{db::models::user::User, spawn_blocking};
@@ -44,6 +45,13 @@ impl Mutation {
 
         if check_reserved_username(&username) {
             return Err(UserCreationError::ReservedUsername("This username is reserved.").into());
+        }
+
+        if !check_valid_uservane(&username) {
+            return Err(UserCreationError::InvalidUsername(
+                "Username can only be alphanuremic and seperated by _.",
+            )
+            .into());
         }
 
         if calculate_password_strength(&password) != 4 {
@@ -102,11 +110,9 @@ impl Mutation {
         let id = session.get::<i32>("id")?;
 
         if let Some(id) = id {
-            let mut changes: UpdateUser = changes.into();   
+            let mut changes: UpdateUser = changes.into();
             changes.id = id;
-            let user = spawn_blocking!(
-                user::update_user(&changes, &mut conn)
-            )??;
+            let user = spawn_blocking!(user::update_user(&changes, &mut conn))??;
             return Ok(user);
         }
         Err(
@@ -217,6 +223,26 @@ impl Mutation {
             index.forum.add(search_forum)?;
 
             return Ok(x);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
+    async fn update_forum_basic<'c>(
+        &self,
+        ctx: &Context<'c>,
+        changes: forum::BasicForumUpdate,
+    ) -> Result<Forum> {
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+        let session = ctx.data::<SharedSession>()?;
+        let id = session.get::<i32>("id")?;
+
+        if let Some(id) = id {
+            let changes: UpdateForum = changes.into();
+            let forum = spawn_blocking!(forum::update_forum(id, &changes, &mut conn))??;
+            return Ok(forum);
         }
         Err(
             async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)

@@ -1,3 +1,5 @@
+use crate::constants::RESERVED_USERNAMES;
+
 #[macro_export]
 macro_rules! spawn_blocking {
     ($val:expr) => {
@@ -25,6 +27,15 @@ pub fn calculate_password_strength(_password: &str) -> i32 {
     uppercase + lowercase + numeric + special
 }
 
-pub fn check_reserved_username(_username: &str) -> bool {
-    false
+pub fn check_reserved_username(username: &str) -> bool {
+    RESERVED_USERNAMES.contains(&username)
+}
+
+pub fn check_valid_uservane(username: &str) -> bool {
+    for ch in username.chars() {
+        if !(ch.is_alphanumeric() || ch == '_') || ch.is_ascii_lowercase() {
+            return false;
+        }
+    }
+    true
 }

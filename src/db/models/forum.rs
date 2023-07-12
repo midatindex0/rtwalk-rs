@@ -4,6 +4,7 @@ use diesel::pg::Pg;
 use diesel::prelude::*;
 use tantivy::{doc, Document};
 
+use super::File;
 use crate::db::models::user::User;
 use crate::db::pool::PostgresPool;
 use crate::schema::{forums, users};
@@ -18,12 +19,24 @@ pub struct Forum {
     pub id: i32,
     pub name: String,
     pub display_name: String,
-    pub icon: Option<String>,
-    pub banner: Option<String>,
+    pub icon: Option<File>,
+    pub banner: Option<File>,
     pub description: Option<String>,
     pub created_at: NaiveDateTime,
     #[graphql(skip)]
     pub owner_id: i32,
+}
+
+#[derive(AsChangeset, Debug)]
+#[diesel(table_name = forums)]
+pub struct UpdateForum {
+    pub id: i32,
+    pub name: Option<String>,
+    pub display_name: Option<String>,
+    pub icon: Option<Option<File>>,
+    pub banner: Option<Option<File>>,
+    pub description: Option<Option<String>>,
+    pub owner_id: Option<i32>,
 }
 
 #[ComplexObject]

@@ -56,8 +56,21 @@ impl CommentHierarchy {
                 edited: comment.0.edited,
                 edited_at: comment.0.edited_at,
                 user: comment.1.clone(),
-                child_comments: Some(CommentHierarchy::load_hierarchy(comments, Some(comment.0.id))),
+                child_comments: Some(CommentHierarchy::load_hierarchy(
+                    comments,
+                    Some(comment.0.id),
+                )),
             })
             .collect()
     }
+}
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = comments)]
+pub struct NewComment {
+    pub user_id: i32,
+    pub post_id: i32,
+    pub parent_id: Option<i32>,
+    pub content: String,
+    pub media: Option<Vec<Option<File>>>,
 }

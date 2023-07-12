@@ -4,7 +4,7 @@ use actix::prelude::*;
 use actix::{Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, Handler, WrapFuture};
 use actix_web_actors::ws::{self, WebsocketContext};
 
-use super::packet::{InComment, InPacket};
+use super::packet::{InComment, InPacket, ListActiveUsers};
 use super::{
     packet::{
         ActiveUser, Connect, ConnectNotification, Disconnect, DisconnectNotification, OutPacket,
@@ -80,9 +80,15 @@ impl Actor for RtSession {
 }
 
 impl Handler<OutPacket> for RtSession {
-    type Result = ();
+    type Result = Option<ActiveUser>;
 
     fn handle(&mut self, msg: OutPacket, ctx: &mut Self::Context) -> Self::Result {
+        let msg = match msg {
+            OutPacket::Identify => {
+                return Some(self.user.clone());
+            }
+            x => x,
+        };
         let msg = serde_json::to_string(&msg);
         match msg {
             Ok(s) => ctx.text(s),
@@ -90,7 +96,8 @@ impl Handler<OutPacket> for RtSession {
                 log::error!("Failed to serialize: {:?}", msg);
                 ctx.stop();
             }
-        }
+        };
+        None
     }
 }
 
@@ -123,6 +130,27 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for RtSession {
                                 media,
                             });
                         }
+                        InPacket::ListActiveUsers => self
+                            .addr
+                            .send(ListActiveUsers {
+                                post_id: self.post_id,
+                            })
+                            .into_actor(self)
+                            .then(|res, act, ctx| {
+                                match res {
+                                    Ok(users) => actix::Handler::handle(
+                                        act,
+                                        OutPacket::ActiveUserList(users),
+                                        ctx,
+                                    ),
+                                    Err(e) => {
+                                        log::error!("{e:?}");
+                                        None
+                                    }
+                                };
+                                fut::ready(())
+                            })
+                            .wait(ctx),
                     },
                     Err(_) => {
                         ctx.stop();

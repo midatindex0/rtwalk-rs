@@ -1,6 +1,7 @@
 mod forum;
 mod post;
 mod user;
+pub mod comment;
 
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},

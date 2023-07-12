@@ -1,11 +1,14 @@
 use actix::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
 };
 
+use crate::{db::pool::PostgresPool, gql::mutations::comment::create_comment};
+
 use self::packet::{
-    Connect, ConnectNotification, Disconnect, DisconnectNotification, InComment, OutComment,
-    OutPacket,
+    ActiveUser, Connect, ConnectNotification, Disconnect, DisconnectNotification, InComment,
+    ListActiveUsers, OutComment, OutPacket,
 };
 
 pub mod packet;
@@ -14,29 +17,51 @@ pub mod session;
 pub struct RtServer {
     active_broadcasts: HashMap<String, Recipient<OutPacket>>,
     broadcasting_posts: HashMap<i32, HashSet<String>>,
+    pool: PostgresPool,
 }
 
-impl Default for RtServer {
-    fn default() -> Self {
+impl RtServer {
+    pub fn new(pool: PostgresPool) -> Self {
         Self {
             active_broadcasts: HashMap::new(),
             broadcasting_posts: HashMap::new(),
+            pool,
         }
     }
 }
 
 impl RtServer {
     fn realy(&self, post_id: i32, inc: InComment) {
-        if let Some(listners) = self.broadcasting_posts.get(&post_id) {
-            for listner in listners {
-                if let Some(addr) = self.active_broadcasts.get(listner) {
-                    addr.do_send(OutPacket::OutComment(OutComment {
-                        user: inc.user.clone(),
-                        post_id: inc.post_id,
-                        parent_id: inc.parent_id,
-                        content: inc.content.clone(),
-                        media: inc.media.clone(),
-                    }));
+        let conn = self.pool.get();
+        if let Ok(mut conn) = conn {
+            match create_comment(
+                inc.user.id,
+                inc.post_id,
+                inc.parent_id,
+                inc.content.clone(),
+                inc.media.clone(),
+                &mut conn,
+            ) {
+                Ok(comment) => {
+                    if let Some(listners) = self.broadcasting_posts.get(&post_id) {
+                        for listner in listners {
+                            if let Some(addr) = self.active_broadcasts.get(listner) {
+                                addr.do_send(OutPacket::OutComment(OutComment {
+                                    id: comment.id,
+                                    created_at: comment.created_at,
+                                    user: inc.user.clone(),
+                                    post_id: inc.post_id,
+                                    parent_id: inc.parent_id,
+                                    content: inc.content.clone(),
+                                    media: inc.media.clone(),
+                                }));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!("{e:?}");
+                    return;
                 }
             }
         }
@@ -96,5 +121,40 @@ impl Handler<InComment> for RtServer {
 
     fn handle(&mut self, msg: InComment, _: &mut Self::Context) {
         self.realy(msg.post_id, msg);
+    }
+}
+
+impl Handler<ListActiveUsers> for RtServer {
+    type Result = Vec<ActiveUser>;
+
+    fn handle(&mut self, msg: ListActiveUsers, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(post) = self.broadcasting_posts.get(&msg.post_id) {
+            let identified_users = Arc::new(Mutex::new(vec![]));
+            for session in post {
+                if let Some(user) = self.active_broadcasts.get(session) {
+                    let x = identified_users.clone();
+                    user.send(OutPacket::Identify)
+                        .into_actor(self)
+                        .then(move |res, _, _| {
+                            match res {
+                                Ok(Some(s)) => {
+                                    x.lock().unwrap().push(s);
+                                }
+                                Ok(None) => {}
+                                _ => {
+                                    log::error!("{res:?}");
+                                }
+                            };
+                            fut::ready(())
+                        })
+                        .wait(ctx);
+                }
+            }
+            return Arc::try_unwrap(identified_users)
+                .unwrap_or_default()
+                .into_inner()
+                .unwrap_or_default();
+        }
+        vec![]
     }
 }

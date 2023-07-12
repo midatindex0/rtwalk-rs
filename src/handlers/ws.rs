@@ -50,7 +50,6 @@ pub async fn connect(
             stream,
         )
     } else {
-        log::error!("test");
         Err(actix_web::error::ErrorUnauthorized(UNAUTHEMTICATED_MESSAGE))
     }
 }

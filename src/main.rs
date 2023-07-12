@@ -61,7 +61,7 @@ async fn main() -> std::io::Result<()> {
 
     let index = SearchIndex::default();
 
-    let rt_server = RtServer::default().start();
+    let rt_server = RtServer::new(pool.clone()).start();
 
     let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(pool.clone())
@@ -76,8 +76,6 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(schema.clone()))
-            .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(hasher.clone()))
             .app_data(web::Data::new(rt_server.clone()))
             .service(gql_handler)
             .service(gql_playground_handler)

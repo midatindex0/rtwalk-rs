@@ -1,4 +1,5 @@
 use actix::prelude::*;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 use crate::db::models::File;
@@ -10,6 +11,7 @@ pub enum InPacket {
         content: String,
         media: Option<Vec<Option<File>>>,
     },
+    ListActiveUsers,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -35,6 +37,8 @@ pub struct InComment {
 #[derive(Debug, Message, Serialize)]
 #[rtype(result = "()")]
 pub struct OutComment {
+    pub id: i32,
+    pub created_at: NaiveDateTime,
     pub user: ActiveUser,
     pub post_id: i32,
     pub parent_id: Option<i32>,
@@ -43,11 +47,13 @@ pub struct OutComment {
 }
 
 #[derive(Debug, Message, Serialize)]
-#[rtype(result = "()")]
+#[rtype(result = "Option<ActiveUser>")]
 pub enum OutPacket {
     ConnectNotification(ConnectNotification),
     DisconnectNotification(DisconnectNotification),
     OutComment(OutComment),
+    ActiveUserList(Vec<ActiveUser>),
+    Identify,
 }
 
 #[derive(Clone, Debug, Message, Serialize)]
@@ -79,6 +85,8 @@ pub struct Disconnect {
     pub notif: DisconnectNotification,
 }
 
-#[derive(Debug, Message)]
+#[derive(Debug, Message, Deserialize)]
 #[rtype(result = "Vec<ActiveUser>")]
-pub struct ListActiveUsers(i32);
+pub struct ListActiveUsers {
+    pub post_id: i32,
+}

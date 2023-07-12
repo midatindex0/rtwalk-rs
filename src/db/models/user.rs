@@ -89,6 +89,10 @@ impl ToDoc for SearchUser {
             bio => self.bio.unwrap_or(String::from("")),
         ))
     }
+
+    fn id(&self) -> i64 {
+        self.id as i64
+    }
 }
 
 impl From<User> for SearchUser {

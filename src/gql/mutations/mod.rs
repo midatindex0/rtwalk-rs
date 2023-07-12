@@ -105,14 +105,19 @@ impl Mutation {
         ctx: &Context<'c>,
         changes: user::BasicUserUpdate,
     ) -> Result<User> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
         let session = ctx.data::<SharedSession>()?;
         let id = session.get::<i32>("id")?;
 
         if let Some(id) = id {
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+            let index = ctx.data::<SearchIndex>()?;
+
             let mut changes: UpdateUser = changes.into();
             changes.id = id;
             let user = spawn_blocking!(user::update_user(&changes, &mut conn))??;
+
+            let index_update: SearchUser = user.clone().into();
+            index.user.update(index_update)?;
             return Ok(user);
         }
         Err(
@@ -235,13 +240,19 @@ impl Mutation {
         ctx: &Context<'c>,
         changes: forum::BasicForumUpdate,
     ) -> Result<Forum> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
         let session = ctx.data::<SharedSession>()?;
         let id = session.get::<i32>("id")?;
 
         if let Some(id) = id {
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+            let index = ctx.data::<SearchIndex>()?;
+
             let changes: UpdateForum = changes.into();
             let forum = spawn_blocking!(forum::update_forum(id, &changes, &mut conn))??;
+
+            let index_update: SearchForum = forum.clone().into();
+            index.forum.update(index_update)?;
+
             return Ok(forum);
         }
         Err(

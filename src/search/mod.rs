@@ -29,6 +29,7 @@ impl SearchResults {
 
 pub trait ToDoc {
     fn to_doc(self, schema: &Schema) -> anyhow::Result<Document>;
+    fn id(&self) -> i64;
 }
 
 impl IndexOp {
@@ -73,6 +74,17 @@ impl IndexOp {
         let schema = self.2.schema();
         let to_insert = document.to_doc(&schema)?;
         writer.add_document(to_insert)?;
+        writer.commit()?;
+        Ok(())
+    }
+
+    pub fn update<T: ToDoc>(&self, document: T) -> anyhow::Result<()> {
+        let mut writer = self.0.lock().unwrap();
+        let schema = self.2.schema();
+        let id = schema.get_field("id")?;
+        writer.delete_term(Term::from_field_i64(id, document.id()));
+        let to_update = document.to_doc(&schema)?;
+        writer.add_document(to_update)?;
         writer.commit()?;
         Ok(())
     }

@@ -82,6 +82,10 @@ impl ToDoc for SearchForum {
             description => self.decsription.unwrap_or(String::from("")),
         ))
     }
+
+    fn id(&self) -> i64 {
+        self.id as i64
+    }
 }
 
 impl From<Forum> for SearchForum {

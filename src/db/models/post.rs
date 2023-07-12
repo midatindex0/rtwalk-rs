@@ -133,6 +133,10 @@ impl ToDoc for SearchPost {
             content => self.content.unwrap_or(String::from("")),
         ))
     }
+
+    fn id(&self) -> i64 {
+        self.id as i64
+    }
 }
 
 impl Into<SearchPost> for Post {

@@ -4,18 +4,53 @@
 
 ## Directory Structure
 
-- `schema.rs` Auto generated schema by diesel
-- `main.rs` Contains the actix webserver
-- `info.rs` Contains version info and stuff
-- `db` Files related to database
-    - `models` Models of data in the database
-        - `user.rs` The user model.
-    - `pool.rs` Database pool
-- `gql` Files related to graphql api
-    - `mutations` Defines functions required to mutate db records
-    - `query` Defines functions required to query db records
-        - `user.rs` Functiosn to query the user data
-    -  `root.rs` Defines the schema
-- `handlers` Defines web route handlets
-    - `gql.rs` Graphql handlers
-- `helpers` Helper functions/structs
+```
+├── auth.rs
+├── constants.rs
+├── core
+│   ├── event.rs
+│   ├── event_session.rs
+│   ├── mod.rs
+│   ├── packet.rs
+│   └── session.rs
+├── db
+│   ├── models
+│   │   ├── comment.rs
+│   │   ├── file.rs
+│   │   ├── forum.rs
+│   │   ├── mod.rs
+│   │   ├── post.rs
+│   │   └── user.rs
+│   ├── mod.rs
+│   └── pool.rs
+├── error
+│   └── mod.rs
+├── gql
+│   ├── mod.rs
+│   ├── mutation
+│   │   ├── comment.rs
+│   │   ├── forum.rs
+│   │   ├── mod.rs
+│   │   ├── post.rs
+│   │   └── user.rs
+│   ├── query
+│   │   ├── comment.rs
+│   │   ├── forum.rs
+│   │   ├── mod.rs
+│   │   ├── post.rs
+│   │   └── user.rs
+│   ├── root.rs
+│   └── subscription
+│       └── mod.rs
+├── handlers
+│   ├── gql.rs
+│   ├── mod.rs
+│   └── ws.rs
+├── helpers
+│   └── mod.rs
+├── info.rs
+├── main.rs
+├── schema.rs
+└── search
+    └── mod.rs
+```

@@ -149,8 +149,9 @@ impl Mutation {
         .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))?;
 
         match x {
-            Ok((true, id)) => {
-                session.insert("id", id)?;
+            Ok((true, user)) => {
+                session.insert("id", user.id)?;
+                session.insert("admin", user.admin)?;
                 session.insert("username", username)?;
                 Ok(true)
             }

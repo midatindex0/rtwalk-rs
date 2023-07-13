@@ -55,6 +55,7 @@ diesel::table! {
         banner -> Nullable<Varchar>,
         created_at -> Timestamp,
         v -> Int4,
+        admin -> Bool,
     }
 }
 

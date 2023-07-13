@@ -32,6 +32,7 @@ pub struct User {
     #[graphql(skip)]
     // Not currently in use
     pub v: i32,
+    pub admin: bool,
 }
 
 #[derive(AsChangeset, Debug)]
@@ -44,6 +45,7 @@ pub struct UpdateUser {
     pub bio: Option<Option<String>>,
     pub pfp: Option<Option<File>>,
     pub banner: Option<Option<File>>,
+    pub admin: Option<bool>,
 }
 
 #[ComplexObject]

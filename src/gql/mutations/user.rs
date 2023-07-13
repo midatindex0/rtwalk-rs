@@ -40,6 +40,7 @@ impl Into<UpdateUser> for BasicUserUpdate {
                     Some(File::new(x))
                 }
             }),
+            admin: None,
         }
     }
 }
@@ -94,8 +95,8 @@ pub fn verify_user<'a>(
     _password: &str,
     conn: &mut crate::Conn,
     hasher: &Argon2,
-) -> Result<(bool, i32), UserAuthError<'a>> {
-    let _user = users
+) -> Result<(bool, User), UserAuthError<'a>> {
+    let _user: User = users
         .filter(username.eq(_username))
         .select(User::as_select())
         .get_result(conn)
@@ -114,6 +115,6 @@ pub fn verify_user<'a>(
         hasher
             .verify_password(_password.as_bytes(), &parsed_hash)
             .is_ok(),
-        _user.id,
+        _user,
     ))
 }

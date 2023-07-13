@@ -62,10 +62,11 @@ pub fn get_posts(
     let filter: RawPostFilter = filter.into();
     let _posts: Vec<MultiPostReturn> = match criteria {
         PostCriteria::Search(query) => {
-            let result =
-                index
-                    .post
-                    .search(&query, filter.page.offset() as usize, filter.page.per as usize)?;
+            let result = index.post.search(
+                &query,
+                filter.page.offset() as usize,
+                filter.page.per as usize,
+            )?;
 
             let ids = result.ids();
 
@@ -158,4 +159,12 @@ pub fn get_posts(
         }
     };
     Ok(_posts)
+}
+
+pub fn get_post_by_id(_id: &i32, conn: &mut crate::Conn) -> anyhow::Result<Post> {
+    let s = posts
+        .filter(id.eq(_id))
+        .select(Post::as_select())
+        .get_result(conn);
+    Ok(s?)
 }

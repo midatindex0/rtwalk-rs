@@ -31,6 +31,7 @@ async fn gql_playground_handler() -> impl Responder {
     Html(
         GraphiQLSource::build()
             .endpoint("/gql")
+            .subscription_endpoint("/gqlws")
             .credentials(Credentials::Include)
             .finish(),
     )

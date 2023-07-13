@@ -40,6 +40,7 @@ impl Into<UpdateComment> for BasicCommentUpdate {
 pub fn create_comment(
     _user_id: i32,
     _post_id: i32,
+    _forum_id: i32,
     _parent_id: Option<i32>,
     _content: String,
     _media: Option<Vec<Option<File>>>,
@@ -48,13 +49,16 @@ pub fn create_comment(
     let new_comment = NewComment {
         user_id: _user_id,
         post_id: _post_id,
+        forum_id: _forum_id,
         parent_id: _parent_id,
         content: _content,
         media: _media,
     };
+
     let x = insert_into(comments)
         .values(&new_comment)
         .get_result::<Comment>(conn)?;
+
     Ok(x)
 }
 

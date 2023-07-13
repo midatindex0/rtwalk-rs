@@ -11,10 +11,10 @@ use self::packet::{
     ListActiveUsers, OutComment, OutPacket,
 };
 
-pub mod packet;
-pub mod session;
 pub mod event;
 pub mod event_session;
+pub mod packet;
+pub mod session;
 
 pub struct RtServer {
     active_broadcasts: HashMap<String, Recipient<OutPacket>>,
@@ -39,6 +39,7 @@ impl RtServer {
             match create_comment(
                 inc.user.id,
                 inc.post_id,
+                inc.forum_id,
                 inc.parent_id,
                 inc.content.clone(),
                 inc.media.clone(),
@@ -53,6 +54,7 @@ impl RtServer {
                                     created_at: comment.created_at,
                                     user: inc.user.clone(),
                                     post_id: inc.post_id,
+                                    forum_id: inc.forum_id,
                                     parent_id: inc.parent_id,
                                     content: inc.content.clone(),
                                     media: inc.media.clone(),

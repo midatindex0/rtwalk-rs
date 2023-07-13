@@ -29,6 +29,7 @@ pub struct ActiveUser {
 pub struct InComment {
     pub user: ActiveUser,
     pub post_id: i32,
+    pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
     pub media: Option<Vec<Option<File>>>,
@@ -41,6 +42,7 @@ pub struct OutComment {
     pub created_at: NaiveDateTime,
     pub user: ActiveUser,
     pub post_id: i32,
+    pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
     pub media: Option<Vec<Option<File>>>,

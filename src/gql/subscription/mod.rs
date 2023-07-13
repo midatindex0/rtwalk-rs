@@ -1,6 +1,6 @@
 use actix::{Actor, Addr};
 use async_graphql::*;
-use futures_core::Stream;
+use futures::Stream;
 
 use crate::core::{
     event::{CommentEvent, EventManager, ForumEvent, PostEvent, UserEvent},
@@ -56,6 +56,7 @@ impl Subscription {
     async fn comment_events<'c>(
         &self,
         ctx: &Context<'c>,
+        forum_ids: Vec<i32>,
     ) -> Result<impl Stream<Item = CommentEvent>> {
         let event_manager = ctx.data::<Addr<EventManager>>()?;
 
@@ -63,6 +64,7 @@ impl Subscription {
 
         CommentEventSession {
             sender: tx,
+            forum_ids,
             manager: event_manager.clone(),
         }
         .start();

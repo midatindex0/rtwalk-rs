@@ -11,11 +11,13 @@ impl Actor for UserEventSession {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        println!("starting session");
         let addr = ctx.address().recipient();
         self.manager.do_send(Com::SubUser(addr));
     }
 
     fn stopping(&mut self, ctx: &mut Self::Context) -> actix::Running {
+        println!("dropping session");
         let addr = ctx.address().recipient();
         self.manager.do_send(Com::UnsubUser(addr));
         actix::Running::Stop
@@ -102,6 +104,7 @@ impl Handler<PostEvent> for PostEventSession {
 
 pub struct CommentEventSession {
     pub sender: futures::channel::mpsc::Sender<CommentEvent>,
+    pub forum_ids: Vec<i32>,
     pub manager: Addr<EventManager>,
 }
 
@@ -124,9 +127,11 @@ impl Handler<CommentEvent> for CommentEventSession {
     type Result = ();
 
     fn handle(&mut self, msg: CommentEvent, ctx: &mut Self::Context) -> Self::Result {
-        match self.sender.try_send(msg) {
-            Ok(_) => {}
-            Err(_) => ctx.stop(),
+        if self.forum_ids.contains(&msg.comment.forum_id) {
+            match self.sender.try_send(msg) {
+                Ok(_) => {}
+                Err(_) => ctx.stop(),
+            }
         }
     }
 }

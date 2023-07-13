@@ -20,6 +20,7 @@ pub struct RtSession {
     pub id: String,
     pub hb: Instant,
     pub post_id: i32,
+    pub forum_id: i32,
     pub user: ActiveUser,
     pub addr: Addr<RtServer>,
 }
@@ -125,6 +126,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for RtSession {
                             self.addr.do_send(InComment {
                                 user: self.user.clone(),
                                 post_id: self.post_id,
+                                forum_id: self.forum_id,
                                 parent_id,
                                 content,
                                 media,

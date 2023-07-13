@@ -5,6 +5,7 @@ diesel::table! {
         id -> Int4,
         user_id -> Int4,
         post_id -> Int4,
+        forum_id -> Int4,
         parent_id -> Nullable<Int4>,
         content -> Text,
         media -> Nullable<Array<Nullable<Text>>>,
@@ -59,6 +60,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(comments -> forums (forum_id));
 diesel::joinable!(comments -> posts (post_id));
 diesel::joinable!(comments -> users (user_id));
 diesel::joinable!(forums -> users (owner_id));

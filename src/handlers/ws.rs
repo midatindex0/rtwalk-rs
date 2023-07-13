@@ -7,8 +7,8 @@ use std::time::Instant;
 use crate::{
     constants::UNAUTHEMTICATED_MESSAGE,
     core::{packet::ActiveUser, session::RtSession, RtServer},
-    db::pool::PostgresPool,
-    gql::query::user::get_user_by_username,
+    db::{models::post::Post, pool::PostgresPool},
+    gql::query::{post::get_post_by_id, user::get_user_by_username},
     spawn_blocking,
 };
 
@@ -25,17 +25,26 @@ pub async fn connect(
     let mut conn = pool
         .get()
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    let mut conn1 = pool
+        .get()
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     let id = uuid::Uuid::new_v4().to_string();
 
     if let Some(username) = session.get::<String>("username")? {
-        let user = spawn_blocking!(get_user_by_username(&username, &mut conn))
+        let user = spawn_blocking!(get_user_by_username(&username, &mut conn1))
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+        let post: Post = spawn_blocking!(get_post_by_id(&post_id, &mut conn))
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
         ws::start(
             RtSession {
                 id,
                 hb: Instant::now(),
                 post_id,
+                forum_id: post.forum_id,
                 user: ActiveUser {
                     id: user.id,
                     username: user.username,

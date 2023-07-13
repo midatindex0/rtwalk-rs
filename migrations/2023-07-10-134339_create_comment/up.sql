@@ -2,6 +2,7 @@ CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     post_id INTEGER NOT NULL REFERENCES posts(id),
+    forum_id INTEGER NOT NULL REFERENCES forums(id),
     parent_id INTEGER REFERENCES comments(id),
     content TEXT NOT NULL,
     media TEXT[],

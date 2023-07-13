@@ -44,35 +44,36 @@ impl Mutation {
         let hasher = ctx.data::<Argon2>()?;
 
         if check_reserved_username(&username) {
-            return Err(UserCreationError::ReservedUsername("This username is reserved.").into());
+            return Err(UserCreationError::ReservedUsername("This username is reserved").into());
+        }
+
+        if username.len() > 10 {
+            return Err(UserCreationError::InvalidUsername(
+                "Usernames can be atmost 10 characters",
+            )
+            .into());
         }
 
         if !check_valid_uservane(&username) {
             return Err(UserCreationError::InvalidUsername(
-                "Username can only be alphanuremic and seperated by _.",
+                "Username can only be lowercase, alphanumeric and seperated by _",
             )
             .into());
         }
 
-        if calculate_password_strength(&password) != 4 {
-            return Err(UserCreationError::LowPasswordStrength(
-                "Password must have 1 uppercase, lowercase, numeric and special char.",
-            )
+        let pass_score = calculate_password_strength(&password, &username)?;
+        if pass_score < 3 {
+            return Err(UserCreationError::LowPasswordStrength(&format!(
+                "Password is too weak [score {}/4]",
+                pass_score
+            ))
             .into());
         }
 
-        if password.len() < 5 {
-            return Err(UserCreationError::PasswordTooShort(
-                "Password must be atleast 5 characters.",
-            )
-            .into());
-        }
-
-        if password.len() > 16 {
-            return Err(UserCreationError::PasswordTooShort(
-                "Password can be atmost 16 characters.",
-            )
-            .into());
+        if password.len() > 32 {
+            return Err(
+                UserCreationError::PasswordTooLong("Password can be atmost 32 characters").into(),
+            );
         }
 
         let salt = SaltString::generate(&mut OsRng);

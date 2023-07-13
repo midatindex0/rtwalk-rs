@@ -2887,6 +2887,7 @@ dependencies = [
  "dotenvy",
  "env_logger",
  "log",
+ "once_cell",
  "opendal",
  "r2d2",
  "rand",

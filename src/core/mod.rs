@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{db::pool::PostgresPool, gql::mutations::comment::create_comment};
+use crate::{db::pool::PostgresPool, gql::mutation::comment::create_comment};
 
 use self::packet::{
     ActiveUser, Connect, ConnectNotification, Disconnect, DisconnectNotification, InComment,
@@ -13,6 +13,8 @@ use self::packet::{
 
 pub mod packet;
 pub mod session;
+pub mod event;
+pub mod event_session;
 
 pub struct RtServer {
     active_broadcasts: HashMap<String, Recipient<OutPacket>>,

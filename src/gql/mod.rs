@@ -1,3 +1,4 @@
 pub mod query;
-pub mod mutations;
+pub mod mutation;
+pub mod subscription;
 pub mod root;

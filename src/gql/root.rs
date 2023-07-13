@@ -1,6 +1,7 @@
-pub use async_graphql::{EmptyMutation, EmptySubscription, Schema as GqlSchema};
+pub use async_graphql::{EmptyMutation, Schema as GqlSchema};
 
-pub use crate::gql::mutations::Mutation;
-pub use crate::gql::query::Query;
+pub use super::mutation::Mutation;
+pub use super::query::Query;
+pub use super::subscription::Subscription;
 
-pub type Schema = GqlSchema<Query, Mutation, EmptySubscription>;
+pub type Schema = GqlSchema<Query, Mutation, Subscription>;

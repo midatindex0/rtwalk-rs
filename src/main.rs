@@ -12,7 +12,7 @@ pub mod search;
 
 use actix::*;
 use actix_session::{storage::RedisActorSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, middleware, web, App, HttpServer};
+use actix_web::{cookie::Key, guard, middleware, web, App, HttpServer};
 use argon2::Argon2;
 use dotenvy::dotenv;
 use opendal::{
@@ -23,12 +23,16 @@ use opendal::{
 
 use std::env;
 
-use crate::{constants::CDN_PATH, core::RtServer, search::SearchIndex};
+use crate::{
+    constants::CDN_PATH,
+    core::{event::EventManager, RtServer},
+    search::SearchIndex,
+};
 
 use self::db::pool;
-use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
+use self::gql::root::{Mutation, Query, Schema, Subscription};
 use self::handlers::{
-    gql::{gql_handler, gql_playground_handler},
+    gql::{gql_handler, gql_playground_handler, gql_ws_handler},
     ws::connect,
 };
 
@@ -62,11 +66,13 @@ async fn main() -> std::io::Result<()> {
     let index = SearchIndex::default();
 
     let rt_server = RtServer::new(pool.clone()).start();
+    let event_manager = EventManager::default().start();
 
-    let schema = Schema::build(Query, Mutation, EmptySubscription)
+    let schema = Schema::build(Query, Mutation, Subscription)
         .data(pool.clone())
         .data(hasher.clone())
         .data(data.clone())
+        .data(event_manager.clone())
         .data(index)
         .data(version)
         .finish();
@@ -79,6 +85,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(rt_server.clone()))
             .service(gql_handler)
             .service(gql_playground_handler)
+            .service(
+                web::resource("/gqlws")
+                    .guard(guard::Get())
+                    .guard(guard::Header("upgrade", "websocket"))
+                    .to(gql_ws_handler),
+            )
             .service(connect)
             .service(
                 web::scope(CDN_PATH).service(

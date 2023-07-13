@@ -3,6 +3,7 @@ mod forum;
 mod post;
 mod user;
 
+use actix::Addr;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher,
@@ -14,6 +15,10 @@ use rand::Rng;
 use crate::{
     auth::SharedSession,
     constants,
+    core::event::{
+        CommentEvent, CommentEventTy, EventManager, ForumEvent, ForumEventTy, PostEvent,
+        PostEventTy, UserEvent, UserEventTy,
+    },
     db::models::{
         comment::{Comment, UpdateComment},
         forum::{Forum, SearchForum, UpdateForum},
@@ -40,10 +45,7 @@ impl Mutation {
         ctx: &Context<'c>,
         username: String,
         password: String,
-    ) -> Result<bool> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
-        let hasher = ctx.data::<Argon2>()?;
-
+    ) -> Result<User> {
         if check_reserved_username(&username) {
             return Err(UserCreationError::ReservedUsername("This username is reserved").into());
         }
@@ -77,6 +79,9 @@ impl Mutation {
             );
         }
 
+        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+        let hasher = ctx.data::<Argon2>()?;
+
         let salt = SaltString::generate(&mut OsRng);
         let hashed_pass = hasher
             .hash_password(password.as_bytes(), &salt)
@@ -96,10 +101,17 @@ impl Mutation {
         .map_err(|e| e.extend_with(|_, e| e.set("code", "500")))??;
 
         let index = ctx.data::<SearchIndex>()?;
-        let search_user: SearchUser = created_user.into();
+        let search_user: SearchUser = created_user.clone().into();
         index.user.add(search_user)?;
 
-        Ok(true)
+        let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+        event_manager.do_send(UserEvent {
+            ty: UserEventTy::UserCreation,
+            user: created_user.clone(),
+        });
+
+        Ok(created_user)
     }
 
     async fn update_user_basic<'c>(
@@ -120,6 +132,14 @@ impl Mutation {
 
             let index_update: SearchUser = user.clone().into();
             index.user.update(index_update)?;
+
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(UserEvent {
+                ty: UserEventTy::UserBasicUpdate,
+                user: user.clone(),
+            });
+
             return Ok(user);
         }
         Err(
@@ -230,6 +250,13 @@ impl Mutation {
             let search_forum: SearchForum = x.clone().into();
             index.forum.add(search_forum)?;
 
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(ForumEvent {
+                ty: ForumEventTy::ForumCreation,
+                forum: x.clone(),
+            });
+
             return Ok(x);
         }
         Err(
@@ -255,6 +282,13 @@ impl Mutation {
 
             let index_update: SearchForum = forum.clone().into();
             index.forum.update(index_update)?;
+
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(ForumEvent {
+                ty: ForumEventTy::ForumBasicUpdate,
+                forum: forum.clone(),
+            });
 
             return Ok(forum);
         }
@@ -290,6 +324,13 @@ impl Mutation {
             let search_post: SearchPost = x.clone().into();
             index.post.add(search_post)?;
 
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(PostEvent {
+                ty: PostEventTy::PostCreation,
+                post: x.clone(),
+            });
+
             return Ok(x);
         }
         Err(
@@ -316,6 +357,13 @@ impl Mutation {
             let index_update: SearchPost = post.clone().into();
             index.post.update(index_update)?;
 
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(PostEvent {
+                ty: PostEventTy::PostBasicUpdate,
+                post: post.clone(),
+            });
+
             return Ok(post);
         }
         Err(
@@ -337,6 +385,13 @@ impl Mutation {
 
             let changes: UpdateComment = changes.into();
             let comment = spawn_blocking!(comment::update_comment(id, &changes, &mut conn))??;
+
+            let event_manager = ctx.data::<Addr<EventManager>>()?;
+
+            event_manager.do_send(CommentEvent {
+                ty: CommentEventTy::CommentCreation,
+                comment: comment.clone(),
+            });
 
             return Ok(comment);
         }

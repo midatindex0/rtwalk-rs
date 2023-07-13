@@ -23,7 +23,7 @@ use opendal::{
 
 use std::env;
 
-use crate::{core::RtServer, search::SearchIndex};
+use crate::{constants::CDN_PATH, core::RtServer, search::SearchIndex};
 
 use self::db::pool;
 use self::gql::root::{EmptySubscription, Mutation, Query, Schema};
@@ -81,7 +81,7 @@ async fn main() -> std::io::Result<()> {
             .service(gql_playground_handler)
             .service(connect)
             .service(
-                web::scope("/cdn").service(
+                web::scope(CDN_PATH).service(
                     actix_files::Files::new("/", "data/")
                         .show_files_listing()
                         .use_last_modified(true),

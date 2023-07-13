@@ -1,4 +1,4 @@
-use async_graphql::SimpleObject;
+use async_graphql::{ComplexObject, SimpleObject};
 use diesel::{
     backend::Backend, deserialize, serialize, sql_types::VarChar, AsExpression, FromSqlRow,
 };
@@ -7,10 +7,21 @@ use serde::{Deserialize, Serialize};
 
 use std::io::prelude::*;
 
+use crate::constants::CDN_PATH;
+
 #[derive(AsExpression, FromSqlRow, Debug, Clone, SimpleObject, Deserialize, Serialize)]
 #[diesel(sql_type = VarChar)]
+#[graphql(complex)]
 pub struct File {
     id: String,
+}
+
+#[ComplexObject]
+impl File {
+    /// Returns path that includes the CDN prefix
+    async fn absolute_path(&self) -> String {
+        format!("{}/{}", CDN_PATH, self.id)
+    }
 }
 
 impl File {

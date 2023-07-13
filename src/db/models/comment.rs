@@ -5,7 +5,7 @@ use diesel::{pg::Pg, prelude::*};
 
 use crate::schema::comments;
 
-#[derive(Clone, Queryable, Selectable, Debug)]
+#[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
 #[diesel(belongs_to(User, foreign_key=user_id))]
 #[diesel(belongs_to(Post, foreign_key=post_id))]
 #[diesel(belongs_to(Comment, foreign_key=parent_id))]
@@ -18,6 +18,17 @@ pub struct Comment {
     pub content: String,
     pub media: Option<Vec<Option<File>>>,
     pub created_at: NaiveDateTime,
+    pub edited: bool,
+    pub edited_at: Option<NaiveDateTime>,
+}
+
+#[derive(AsChangeset, Debug)]
+#[diesel(table_name = comments)]
+pub struct UpdateComment {
+    pub id: i32,
+    pub user_id: Option<i32>,
+    pub content: Option<String>,
+    pub media: Option<Option<Vec<Option<File>>>>,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
 }

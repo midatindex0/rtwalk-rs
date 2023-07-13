@@ -15,6 +15,7 @@ use crate::{
     auth::SharedSession,
     constants,
     db::models::{
+        comment::{Comment, UpdateComment},
         forum::{Forum, SearchForum, UpdateForum},
         post::{InputPost, Post, SearchPost, UpdatePost},
         user::{SearchUser, UpdateUser},
@@ -316,6 +317,28 @@ impl Mutation {
             index.post.update(index_update)?;
 
             return Ok(post);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
+    async fn update_comment_basic<'c>(
+        &self,
+        ctx: &Context<'c>,
+        changes: comment::BasicCommentUpdate,
+    ) -> Result<Comment> {
+        let session = ctx.data::<SharedSession>()?;
+        let id = session.get::<i32>("id")?;
+
+        if let Some(id) = id {
+            let mut conn = ctx.data::<PostgresPool>()?.get()?;
+
+            let changes: UpdateComment = changes.into();
+            let comment = spawn_blocking!(comment::update_comment(id, &changes, &mut conn))??;
+
+            return Ok(comment);
         }
         Err(
             async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)

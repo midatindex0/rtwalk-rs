@@ -77,14 +77,15 @@ impl Query {
     async fn forums<'c>(
         &self,
         ctx: &Context<'c>,
-        filter: Option<ForumFilter>,
         criteria: ForumCriteria,
+        filter: Option<ForumFilter>,
+        order: Option<forum::ForumOrderBy>
     ) -> Result<Vec<forum::MultiForumReturn>> {
         let mut conn = ctx.data::<PostgresPool>()?.get()?;
         let index = ctx.data::<SearchIndex>()?.clone();
 
         let forums = actix_rt::task::spawn_blocking(move || {
-            forum::get_forums(criteria, filter, &index, &mut conn)
+            forum::get_forums(criteria, filter, order, &index, &mut conn)
         })
         .await??;
 

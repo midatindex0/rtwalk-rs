@@ -1,12 +1,12 @@
-use async_graphql::{InputObject, OneofObject, SimpleObject};
+use async_graphql::{Enum, InputObject, OneofObject, SimpleObject};
 use diesel::dsl::count;
 use diesel::prelude::*;
 
 use super::Page;
 use crate::db::models::forum::Forum;
-use crate::schema::forums;
 use crate::schema::forums::dsl::{id, name};
 use crate::schema::posts;
+use crate::schema::{comments, forums};
 use crate::search::SearchIndex;
 
 #[derive(InputObject, Default)]
@@ -43,40 +43,70 @@ pub enum ForumCriteria {
     ByIds(Vec<i32>),
 }
 
-// TODO: Add order by [struct Order]
+#[derive(Enum, Clone, Copy, Eq, PartialEq)]
+pub enum ForumOrderBy {
+    Posts,
+    Comments,
+    Newest,
+    Oldest,
+    RecentPost,
+}
+
+impl Default for ForumOrderBy {
+    fn default() -> Self {
+        Self::RecentPost
+    }
+}
 
 #[derive(SimpleObject)]
 pub struct MultiForumReturn {
     pub forum: Forum,
     pub num_posts: i64,
+    pub num_comments: i64,
     pub score: Option<f32>,
 }
 
 pub fn get_forums(
     criteria: ForumCriteria,
     filter: Option<ForumFilter>,
+    order: Option<ForumOrderBy>,
     index: &SearchIndex,
     conn: &mut crate::Conn,
 ) -> anyhow::Result<Vec<MultiForumReturn>> {
     let filter: RawForumFilter = filter.into();
+
+    let order = order.unwrap_or_default();
+
+    let mut common = forums::table
+        .inner_join(posts::table)
+        .inner_join(comments::table)
+        .group_by(forums::id)
+        .having(count(posts::id).gt(filter.post_count.gt))
+        .offset(filter.page.offset() as i64)
+        .limit(filter.page.per as i64)
+        .select((Forum::as_select(), count(posts::id), count(comments::id)))
+        .into_boxed();
+
+    common = match order {
+        ForumOrderBy::Posts => common.order(count(posts::id).desc()),
+        ForumOrderBy::Comments => common.order(count(comments::id).desc()),
+        ForumOrderBy::Newest => common.order(forums::created_at.desc()),
+        ForumOrderBy::Oldest => common.order(forums::created_at.asc()),
+        ForumOrderBy::RecentPost =>  common.order(posts::created_at.desc()),
+    };
+
     let x: Vec<MultiForumReturn> = match criteria {
         ForumCriteria::Search(query) => {
-            let result =
-                index
-                    .forum
-                    .search(&query, filter.page.offset() as usize, filter.page.per as usize)?;
+            let result = index.forum.search(
+                &query,
+                filter.page.offset() as usize,
+                filter.page.per as usize,
+            )?;
             let ids = result.ids();
 
-            // TODO: Join owner
-            let _forums: Vec<(Forum, i64)> = forums::table
-                .inner_join(posts::table)
-                .group_by(forums::id)
-                .having(count(posts::id).gt(filter.post_count.gt))
+            let _forums: Vec<(Forum, i64, i64)> = common
                 .filter(id.eq_any(ids))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Forum::as_select(), count(posts::id)))
-                .load::<(Forum, i64)>(conn)?;
+                .load::<(Forum, i64, i64)>(conn)?;
 
             let _forums = _forums
                 .into_iter()
@@ -84,27 +114,24 @@ pub fn get_forums(
                     score: result.map_id_score(x.0.id),
                     forum: x.0,
                     num_posts: x.1,
+                    num_comments: x.2,
                 })
                 .collect();
 
             _forums
         }
         ForumCriteria::ByNames(names) => {
-            let _forums: Vec<(Forum, i64)> = forums::table
-                .inner_join(posts::table)
-                .group_by(forums::id)
-                .having(count(posts::id).gt(filter.post_count.gt))
-                .filter(name.eq_any(names))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Forum::as_select(), count(posts::id)))
-                .load::<(Forum, i64)>(conn)?;
+            let _forums: Vec<(Forum, i64, i64)> =
+                common
+                    .filter(name.eq_any(names))
+                    .load::<(Forum, i64, i64)>(conn)?;
 
             let _forums = _forums
                 .into_iter()
                 .map(|x| MultiForumReturn {
                     forum: x.0,
                     num_posts: x.1,
+                    num_comments: x.2,
                     score: None,
                 })
                 .collect();
@@ -112,21 +139,16 @@ pub fn get_forums(
             _forums
         }
         ForumCriteria::ByIds(ids) => {
-            let _forums: Vec<(Forum, i64)> = forums::table
-                .inner_join(posts::table)
-                .group_by(forums::id)
-                .having(count(posts::id).gt(filter.post_count.gt))
+            let _forums: Vec<(Forum, i64, i64)> = common
                 .filter(id.eq_any(ids))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Forum::as_select(), count(posts::id)))
-                .load::<(Forum, i64)>(conn)?;
+                .load::<(Forum, i64, i64)>(conn)?;
 
             let _forums = _forums
                 .into_iter()
                 .map(|x| MultiForumReturn {
                     forum: x.0,
                     num_posts: x.1,
+                    num_comments: x.2,
                     score: None,
                 })
                 .collect();

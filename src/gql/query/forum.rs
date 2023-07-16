@@ -1,5 +1,5 @@
 use async_graphql::{Enum, InputObject, OneofObject, SimpleObject};
-use diesel::dsl::count;
+use diesel::dsl::{count, max};
 use diesel::prelude::*;
 
 use super::Page;
@@ -92,8 +92,9 @@ pub fn get_forums(
         ForumOrderBy::Comments => common.order(count(comments::id).desc()),
         ForumOrderBy::Newest => common.order(forums::created_at.desc()),
         ForumOrderBy::Oldest => common.order(forums::created_at.asc()),
-        ForumOrderBy::RecentPost =>  common.order(posts::created_at.desc()),
+        ForumOrderBy::RecentPost =>  common.order(max(posts::created_at).desc()),
     };
+
 
     let x: Vec<MultiForumReturn> = match criteria {
         ForumCriteria::Search(query) => {

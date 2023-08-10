@@ -1,15 +1,10 @@
-use super::{user::User, File};
 use async_graphql::SimpleObject;
 use chrono::NaiveDateTime;
-use diesel::{pg::Pg, prelude::*};
+use sqlx::FromRow;
 
-use crate::schema::comments;
+use super::{user::User, FileList};
 
-#[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
-#[diesel(belongs_to(User, foreign_key=user_id))]
-#[diesel(belongs_to(Post, foreign_key=post_id))]
-#[diesel(belongs_to(Comment, foreign_key=parent_id))]
-#[diesel(check_for_backend(Pg))]
+#[derive(Clone, Debug, SimpleObject, FromRow)]
 pub struct Comment {
     pub id: i32,
     pub user_id: i32,
@@ -17,19 +12,19 @@ pub struct Comment {
     pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
-    pub media: Option<Vec<Option<File>>>,
+    #[sqlx(try_from = "Option<Vec<String>>")]
+    pub media: FileList,
     pub created_at: NaiveDateTime,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
 }
 
-#[derive(AsChangeset, Debug)]
-#[diesel(table_name = comments)]
+#[derive(Debug)]
 pub struct UpdateComment {
     pub id: i32,
     pub user_id: Option<i32>,
     pub content: Option<String>,
-    pub media: Option<Option<Vec<Option<File>>>>,
+    pub media: Option<FileList>,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
 }
@@ -42,7 +37,7 @@ pub struct CommentHierarchy {
     pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
-    pub media: Option<Vec<Option<File>>>,
+    pub media: FileList,
     pub created_at: NaiveDateTime,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
@@ -79,13 +74,12 @@ impl CommentHierarchy {
     }
 }
 
-#[derive(Debug, Insertable)]
-#[diesel(table_name = comments)]
+#[derive(Debug)]
 pub struct NewComment {
     pub user_id: i32,
     pub post_id: i32,
     pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
-    pub media: Option<Vec<Option<File>>>,
+    pub media: Option<Vec<String>>,
 }

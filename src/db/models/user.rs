@@ -1,24 +1,12 @@
-use crate::{
-    db::{models::File, pool::PostgresPool},
-    schema::{forums, users},
-    search::ToDoc,
-};
+use crate::{db::models::MaybeEmptyFile, search::ToDoc};
 
-use async_graphql::{ComplexObject, Context, SimpleObject};
+use async_graphql::SimpleObject;
 use chrono::NaiveDateTime;
-use diesel::prelude::*;
-use diesel::{Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use tantivy::{doc, Document};
 
-use super::forum::Forum;
-
-/// Represents a user in the db.
-/// Password is not public to restrict direct access. Use [`User::match_password`] instead
-#[derive(Clone, Debug, Queryable, Selectable, SimpleObject, Deserialize, Serialize)]
-#[diesel(table_name = users)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-#[graphql(complex)]
+#[derive(Clone, Debug, SimpleObject, Deserialize, Serialize, FromRow)]
 pub struct User {
     pub id: i32,
     pub username: String,
@@ -26,8 +14,10 @@ pub struct User {
     pub password: String,
     pub display_name: String,
     pub bio: Option<String>,
-    pub pfp: Option<File>,
-    pub banner: Option<File>,
+    #[sqlx(try_from = "Option<String>")]
+    pub pfp: MaybeEmptyFile,
+    #[sqlx(try_from = "Option<String>")]
+    pub banner: MaybeEmptyFile,
     pub created_at: NaiveDateTime,
     #[graphql(skip)]
     // Not currently in use
@@ -35,39 +25,24 @@ pub struct User {
     pub admin: bool,
 }
 
-#[derive(AsChangeset, Debug)]
-#[diesel(table_name = users)]
+#[derive(Debug)]
 pub struct UpdateUser {
     pub id: i32,
     pub username: Option<String>,
     pub password: Option<String>,
     pub display_name: Option<String>,
     pub bio: Option<Option<String>>,
-    pub pfp: Option<Option<File>>,
-    pub banner: Option<Option<File>>,
+    pub pfp: Option<MaybeEmptyFile>,
+    pub banner: Option<MaybeEmptyFile>,
     pub admin: Option<bool>,
 }
 
-#[ComplexObject]
-impl User {
-    async fn owned_forums<'ctx>(&self, ctx: &Context<'ctx>) -> async_graphql::Result<Vec<Forum>> {
-        let pool = ctx.data::<PostgresPool>().unwrap();
-        let mut conn = pool.get()?;
-        let forums = forums::table
-            .filter(forums::dsl::owner_id.eq(self.id))
-            .load::<Forum>(&mut conn)?;
-        Ok(forums)
-    }
-}
-
 /// Represents a new user that will be inserted into the db
-#[derive(Debug, Insertable)]
-#[diesel(table_name = users)]
+#[derive(Debug)]
 pub struct NewUser<'a> {
     pub username: &'a str,
     pub password: &'a str,
     pub display_name: &'a str,
-    pub bio: Option<&'a str>,
 }
 
 #[derive(Debug)]

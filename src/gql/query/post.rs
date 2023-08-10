@@ -1,12 +1,14 @@
-use async_graphql::{InputObject, OneofObject, SimpleObject};
+use async_graphql::{Enum, InputObject, OneofObject, SimpleObject};
 use diesel::prelude::*;
 
 use super::Page;
+use crate::db::models::comment::Comment;
 use crate::db::models::forum::Forum;
 use crate::db::models::post::{Post, RawPost};
 use crate::db::models::user::User;
+use crate::schema::posts;
 use crate::schema::posts::dsl::*;
-use crate::schema::{forums, users};
+use crate::schema::{comments, forums, users};
 use crate::search::SearchIndex;
 
 #[derive(InputObject, Default)]
@@ -43,12 +45,26 @@ pub enum PostCriteria {
     ByForumId(i32),
 }
 
+#[derive(Enum, Clone, Copy, Eq, PartialEq)]
+pub enum PostOrderBy {
+    Comments,
+    Newest,
+    Oldest,
+    RecentComment,
+}
+
+impl Default for PostOrderBy {
+    fn default() -> Self {
+        Self::Newest
+    }
+}
+
 #[derive(SimpleObject)]
 pub struct MultiPostReturn {
     pub post: RawPost,
-    pub poster: User,
-    pub forum: Forum,
-    // TODO:
+    // pub poster: User,
+    // pub forum: Forum,
+    // pub num_comments: i64,
     // pub participants: Vec<User>,
     pub score: Option<f32>,
 }
@@ -60,6 +76,14 @@ pub fn get_posts(
     conn: &mut crate::Conn,
 ) -> anyhow::Result<Vec<MultiPostReturn>> {
     let filter: RawPostFilter = filter.into();
+
+    let common = posts::table
+        .filter(stars.ge(filter.star.gt))
+        .offset(filter.page.offset() as i64)
+        .limit(filter.page.per as i64)
+        .select(Post::as_select())
+        .into_boxed();
+
     let _posts: Vec<MultiPostReturn> = match criteria {
         PostCriteria::Search(query) => {
             let result = index.post.search(
@@ -70,23 +94,18 @@ pub fn get_posts(
 
             let ids = result.ids();
 
-            let _posts: Vec<(Post, User, Forum)> = posts
-                .inner_join(users::table)
-                .inner_join(forums::table)
+            let _posts: Vec<Post> = posts::table
+                .select(Post::as_select())
                 .filter(id.eq_any(ids))
-                .filter(stars.gt(filter.star.gt))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Post::as_select(), User::as_select(), Forum::as_select()))
                 .load(conn)?;
 
             let _posts = _posts
                 .into_iter()
                 .map(|x| MultiPostReturn {
-                    score: result.map_id_score(x.0.id),
-                    post: RawPost::from(x.0),
-                    poster: x.1,
-                    forum: x.2,
+                    score: result.map_id_score(x.id),
+                    post: RawPost::from(x),
+                    // poster: x.1,
+                    // forum: x.2,
                 })
                 .collect();
             _posts
@@ -107,8 +126,8 @@ pub fn get_posts(
                 .map(|x| MultiPostReturn {
                     score: None,
                     post: RawPost::from(x.0),
-                    poster: x.1,
-                    forum: x.2,
+                    // poster: x.1,
+                    // forum: x.2,
                 })
                 .collect();
             _posts
@@ -129,8 +148,8 @@ pub fn get_posts(
                 .map(|x| MultiPostReturn {
                     score: None,
                     post: RawPost::from(x.0),
-                    poster: x.1,
-                    forum: x.2,
+                    // poster: x.1,
+                    // forum: x.2,
                 })
                 .collect();
             _posts
@@ -151,8 +170,8 @@ pub fn get_posts(
                 .map(|x| MultiPostReturn {
                     score: None,
                     post: RawPost::from(x.0),
-                    poster: x.1,
-                    forum: x.2,
+                    // poster: x.1,
+                    // forum: x.2,
                 })
                 .collect();
             _posts

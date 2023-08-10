@@ -1,13 +1,10 @@
 use async_graphql::InputObject;
-use diesel::{insert_into, ExpressionMethods, RunQueryDsl};
 use log;
+use sqlx::{Postgres, QueryBuilder};
 
 use crate::db::models::forum::{Forum, NewForum, UpdateForum};
-use crate::db::models::File;
+use crate::db::models::MaybeEmptyFile;
 use crate::error::ForumCreationError;
-use crate::schema::forums::dsl::*;
-
-type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
 #[derive(InputObject)]
 pub struct BasicForumUpdate {
@@ -28,68 +25,116 @@ impl Into<UpdateForum> for BasicForumUpdate {
             description: self
                 ._description
                 .map(|x| if x.is_empty() { None } else { Some(x) }),
-            icon: self._icon.map(|x| {
-                if x.is_empty() {
-                    None
-                } else {
-                    Some(File::new(x))
-                }
-            }),
-            banner: self._banner.map(|x| {
-                if x.is_empty() {
-                    None
-                } else {
-                    Some(File::new(x))
-                }
-            }),
+            icon: self._icon.map(MaybeEmptyFile::new),
+            banner: self._banner.map(MaybeEmptyFile::new),
         }
     }
 }
 
-pub fn update_forum(user_id: i32, changes: &UpdateForum, conn: &mut Conn) -> anyhow::Result<Forum> {
-    let x = diesel::update(forums)
-        .set(changes)
-        .filter(owner_id.eq(user_id))
-        .get_result::<Forum>(conn)?;
-    Ok(x)
+pub async fn create_forum(
+    owner_id: i32,
+    forum_name: String,
+    display_name: String,
+    description: Option<String>,
+    pool: &crate::Pool,
+) -> anyhow::Result<Forum> {
+    let new_forum = NewForum {
+        name: &forum_name,
+        display_name: &display_name,
+        description: description.as_deref(),
+        owner_id: owner_id,
+    };
+
+    let forum = sqlx::query_as!(
+        Forum,
+        "
+        INSERT INTO forums (name, display_name, description, owner_id)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *;
+        ",
+        new_forum.name,
+        new_forum.display_name,
+        new_forum.description,
+        new_forum.owner_id,
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(forum)
 }
 
-pub fn create_forum<'a>(
-    _owner_id: i32,
-    _forum_name: String,
-    _display_name: String,
-    _description: Option<String>,
-    conn: &mut Conn,
-) -> Result<Forum, ForumCreationError<'a>> {
-    let new_forum = NewForum {
-        name: &_forum_name,
-        display_name: &_display_name,
-        description: _description.as_deref(),
-        owner_id: _owner_id,
-    };
-    match insert_into(forums)
-        .values(&new_forum)
-        .get_result::<Forum>(conn)
-    {
-        Ok(_forum) => Ok(_forum),
-        Err(err) => match err {
-            diesel::result::Error::DatabaseError(kind, info) => match kind {
-                diesel::result::DatabaseErrorKind::UniqueViolation => Err(
-                    ForumCreationError::ForumAlreadyExists("Forum already exists."),
-                ),
-                _ => {
-                    log::error!("{:?}", info);
-                    Err(ForumCreationError::InternalError(
-                        "Some error occured, try again later.",
-                    ))
-                }
-            },
-            _ => {
-                log::error!("{:?}", err);
-                Err(ForumCreationError::InternalError(
-                    "Some error occured, try again later.",
-                ))
-            }
-        },
+pub async fn update_forum(
+    user_id: i32,
+    changes: &UpdateForum,
+    pool: &crate::Pool,
+) -> anyhow::Result<Forum> {
+    let mut builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE forums SET ");
+    let mut prev = false;
+    if let Some(v) = &changes.name {
+        builder.push("name = ");
+        builder.push_bind(v);
+        prev = true;
     }
+    if let Some(v) = &changes.display_name {
+        if prev {
+            builder.push(", ");
+        }
+        prev = true;
+        builder.push("display_name = ");
+        builder.push_bind(v);
+    }
+    if let Some(v) = &changes.description {
+        if prev {
+            builder.push(", ");
+        }
+        prev = true;
+        builder.push("description = ");
+        builder.push_bind(v);
+    }
+    if let Some(v) = &changes.icon {
+        if v.status().await?.updatable() {
+            if prev {
+                builder.push(", ");
+            }
+            prev = true;
+            builder.push("icon = ");
+            builder.push_bind(&v.id);
+        } else {
+            return Err(anyhow::Error::msg(format!(
+                "File with id: {} doesn't exist (icon change)",
+                &v.id.clone().unwrap_or("null".into())
+            )));
+        }
+    }
+    if let Some(v) = &changes.banner {
+        if v.status().await?.updatable() {
+            if prev {
+                builder.push(", ");
+            }
+            prev = true;
+            builder.push("banner = ");
+            builder.push_bind(&v.id);
+        } else {
+            return Err(anyhow::Error::msg(format!(
+                "File with id: {} doesn't exist (banner change)",
+                &v.id.clone().unwrap_or("null".into())
+            )));
+        }
+    }
+    if let Some(v) = &changes.owner_id {
+        if prev {
+            builder.push(", ");
+        }
+        builder.push("owner_id = ");
+        builder.push_bind(v);
+    }
+    builder.push(" WHERE id = ");
+    builder.push_bind(changes.id);
+    builder.push(" AND owner_id = ");
+    builder.push_bind(user_id);
+    builder.push(" RETURNING *;");
+
+    let forum = builder.build_query_as::<Forum>().fetch_one(pool).await?;
+
+    Ok(forum)
 }

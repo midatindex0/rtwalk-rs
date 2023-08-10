@@ -1,30 +1,21 @@
-use async_graphql::{ComplexObject, Context, InputObject, SimpleObject};
+use async_graphql::{InputObject, SimpleObject};
 use chrono::NaiveDateTime;
-use diesel::pg::Pg;
-use diesel::prelude::*;
+use sqlx::FromRow;
 use tantivy::{doc, Document};
 
-use crate::db::models::{forum::Forum, user::User};
-
-use super::File;
-use crate::db::pool::PostgresPool;
-use crate::schema::{forums, posts, users};
+use super::FileList;
 use crate::search::ToDoc;
 
-#[derive(Clone, Queryable, Selectable, Debug, SimpleObject)]
-#[diesel(belongs_to(User, foreign_key=poster_id))]
-#[diesel(belongs_to(Forum, foreign_key=forum_id))]
-#[diesel(check_for_backend(Pg))]
-#[diesel(table_name=posts)]
-#[graphql(complex)]
+#[derive(Clone, Debug, SimpleObject, FromRow)]
 pub struct Post {
     pub id: i32,
-    pub tags: Option<Vec<Option<String>>>,
+    pub tags: Option<Vec<String>>,
     pub stars: i32,
     pub title: String,
     pub slug: String,
     pub content: Option<String>,
-    pub media: Option<Vec<Option<File>>>,
+    #[sqlx(try_from = "Option<Vec<String>>")]
+    pub media: FileList,
     pub created_at: NaiveDateTime,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
@@ -32,79 +23,21 @@ pub struct Post {
     pub poster_id: i32,
 }
 
-#[derive(AsChangeset, Debug)]
-#[diesel(table_name = posts)]
+#[derive(Debug)]
 pub struct UpdatePost {
     pub id: i32,
-    pub tags: Option<Option<Vec<Option<String>>>>,
+    pub tags: Option<Option<Vec<String>>>,
     pub stars: Option<i32>,
     pub title: Option<String>,
     pub slug: Option<String>,
     pub content: Option<Option<String>>,
-    pub media: Option<Option<Vec<Option<File>>>>,
+    pub media: Option<FileList>,
     pub edited: bool,
     pub edited_at: Option<NaiveDateTime>,
     pub poster_id: Option<i32>,
 }
 
-#[derive(SimpleObject)]
-pub struct RawPost {
-    pub id: i32,
-    pub tags: Option<Vec<Option<String>>>,
-    pub stars: i32,
-    pub title: String,
-    pub slug: String,
-    pub content: Option<String>,
-    pub media: Option<Vec<Option<File>>>,
-    pub created_at: NaiveDateTime,
-    pub edited: bool,
-    pub edited_at: Option<NaiveDateTime>,
-    pub forum_id: i32,
-    pub poster_id: i32,
-}
-
-impl From<Post> for RawPost {
-    fn from(value: Post) -> Self {
-        Self {
-            id: value.id,
-            tags: value.tags,
-            stars: value.stars,
-            title: value.title,
-            slug: value.slug,
-            content: value.content,
-            media: value.media,
-            created_at: value.created_at,
-            edited: value.edited,
-            edited_at: value.edited_at,
-            forum_id: value.forum_id,
-            poster_id: value.poster_id,
-        }
-    }
-}
-
-#[ComplexObject]
-impl Post {
-    async fn forum<'ctx>(&self, ctx: &Context<'ctx>) -> async_graphql::Result<Forum> {
-        let pool = ctx.data::<PostgresPool>().unwrap();
-        let mut conn = pool.get()?;
-        let forum = forums::table
-            .find(self.forum_id)
-            .get_result::<Forum>(&mut conn)?;
-        Ok(forum)
-    }
-
-    async fn poster<'ctx>(&self, ctx: &Context<'ctx>) -> async_graphql::Result<User> {
-        let pool = ctx.data::<PostgresPool>().unwrap();
-        let mut conn = pool.get()?;
-        let user = users::table
-            .find(self.poster_id)
-            .get_result::<User>(&mut conn)?;
-        Ok(user)
-    }
-}
-
-#[derive(Debug, Insertable)]
-#[diesel(table_name = posts)]
+#[derive(Debug)]
 pub struct NewPost {
     pub tags: Option<Vec<String>>,
     pub title: String,
@@ -130,7 +63,7 @@ pub struct InputPost {
 #[derive(Debug)]
 pub struct SearchPost {
     pub id: i32,
-    pub tags: Option<Vec<Option<String>>>,
+    pub tags: Option<Vec<String>>,
     pub title: String,
     pub content: Option<String>,
 }
@@ -143,7 +76,7 @@ impl ToDoc for SearchPost {
         let content = schema.get_field("content")?;
         Ok(doc!(
             id => self.id as i64,
-            tags => self.tags.unwrap_or(vec![]).into_iter().filter_map(|x| x).collect::<Vec::<_>>().join(" "),
+            tags => self.tags.unwrap_or(vec![]).into_iter().collect::<Vec::<_>>().join(" "),
             title => self.title,
             content => self.content.unwrap_or(String::from("")),
         ))

@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{db::pool::PostgresPool, gql::mutation::comment::create_comment};
+use crate::gql::mutation::comment::create_comment;
 
 use self::packet::{
     ActiveUser, Connect, ConnectNotification, Disconnect, DisconnectNotification, InComment,
@@ -19,11 +19,11 @@ pub mod session;
 pub struct RtServer {
     active_broadcasts: HashMap<String, Recipient<OutPacket>>,
     broadcasting_posts: HashMap<i32, HashSet<String>>,
-    pool: PostgresPool,
+    pool: crate::Pool,
 }
 
 impl RtServer {
-    pub fn new(pool: PostgresPool) -> Self {
+    pub fn new(pool: crate::Pool) -> Self {
         Self {
             active_broadcasts: HashMap::new(),
             broadcasting_posts: HashMap::new(),
@@ -34,39 +34,40 @@ impl RtServer {
 
 impl RtServer {
     fn realy(&self, post_id: i32, inc: InComment) {
-        let conn = self.pool.get();
-        if let Ok(mut conn) = conn {
-            match create_comment(
-                inc.user.id,
-                inc.post_id,
-                inc.forum_id,
-                inc.parent_id,
-                inc.content.clone(),
-                inc.media.clone(),
-                &mut conn,
-            ) {
-                Ok(comment) => {
-                    if let Some(listners) = self.broadcasting_posts.get(&post_id) {
-                        for listner in listners {
-                            if let Some(addr) = self.active_broadcasts.get(listner) {
-                                addr.do_send(OutPacket::OutComment(OutComment {
-                                    id: comment.id,
-                                    created_at: comment.created_at,
-                                    user: inc.user.clone(),
-                                    post_id: inc.post_id,
-                                    forum_id: inc.forum_id,
-                                    parent_id: inc.parent_id,
-                                    content: inc.content.clone(),
-                                    media: inc.media.clone(),
-                                }));
-                            }
+        let rt = tokio::runtime::Runtime::new();
+        if rt.is_err() {
+            return;
+        }
+        match rt.unwrap().block_on(create_comment(
+            inc.user.id,
+            inc.post_id,
+            inc.forum_id,
+            inc.parent_id,
+            inc.content.clone(),
+            inc.media.ids(),
+            &self.pool,
+        )) {
+            Ok(comment) => {
+                if let Some(listners) = self.broadcasting_posts.get(&post_id) {
+                    for listner in listners {
+                        if let Some(addr) = self.active_broadcasts.get(listner) {
+                            addr.do_send(OutPacket::OutComment(OutComment {
+                                id: comment.id,
+                                created_at: comment.created_at,
+                                user: inc.user.clone(),
+                                post_id: inc.post_id,
+                                forum_id: inc.forum_id,
+                                parent_id: inc.parent_id,
+                                content: inc.content.clone(),
+                                media: inc.media.clone(),
+                            }));
                         }
                     }
                 }
-                Err(e) => {
-                    log::error!("{e:?}");
-                    return;
-                }
+            }
+            Err(e) => {
+                log::error!("{e:?}");
+                return;
             }
         }
     }

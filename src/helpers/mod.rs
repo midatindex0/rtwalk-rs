@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{constants::{ALLOWED_USERNAME_CHARS, RESERVED_USERNAMES}};
+use crate::constants::{ALLOWED_USERNAME_CHARS, RESERVED_USERNAMES};
 
 #[macro_export]
 macro_rules! spawn_blocking {

@@ -11,13 +11,11 @@ impl Actor for UserEventSession {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        println!("starting session");
         let addr = ctx.address().recipient();
         self.manager.do_send(Com::SubUser(addr));
     }
 
     fn stopping(&mut self, ctx: &mut Self::Context) -> actix::Running {
-        println!("dropping session");
         let addr = ctx.address().recipient();
         self.manager.do_send(Com::UnsubUser(addr));
         actix::Running::Stop

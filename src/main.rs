@@ -7,10 +7,10 @@ mod gql;
 mod handlers;
 pub mod helpers;
 mod info;
-pub mod schema;
 pub mod search;
 
 use actix::*;
+use actix_cors::Cors;
 use actix_session::{storage::RedisActorSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, guard, middleware, web, App, HttpServer};
 use argon2::Argon2;
@@ -20,6 +20,7 @@ use opendal::{
     services::Fs,
     Operator,
 };
+use sqlx::PgPool;
 
 use std::env;
 
@@ -29,14 +30,11 @@ use crate::{
     search::SearchIndex,
 };
 
-use self::db::pool;
 use self::gql::root::{Mutation, Query, Schema, Subscription};
-use self::handlers::{
-    gql::{gql_handler, gql_playground_handler, gql_ws_handler},
-    ws::connect,
-};
+use self::handlers::gql::{gql_handler, gql_playground_handler, gql_ws_handler};
 
-type Conn = r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
+type Pool = sqlx::Pool<sqlx::Postgres>;
+// type Conn = sqlx::pool::PoolConnection<sqlx::Postgres>;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
@@ -46,7 +44,7 @@ async fn main() -> std::io::Result<()> {
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL not set");
     let redis_url = env::var("REDIS_URL").expect("REDIS_URL not set");
     let key = Key::from(env::var("AUTH_KEY").expect("AUTH_KEY not set").as_bytes());
-    let pool = pool::get_pool(&db_url).expect("Could not create database pool");
+    let pool = PgPool::connect(&db_url).await.unwrap();
     let hasher = Argon2::default();
     let version = info::VersionInfo {
         major: 0,
@@ -83,6 +81,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(schema.clone()))
             .app_data(web::Data::new(rt_server.clone()))
+            .wrap(Cors::permissive())
             .service(gql_handler)
             .service(gql_playground_handler)
             .service(
@@ -91,7 +90,7 @@ async fn main() -> std::io::Result<()> {
                     .guard(guard::Header("upgrade", "websocket"))
                     .to(gql_ws_handler),
             )
-            .service(connect)
+            // .service(connect)
             .service(
                 web::scope(CDN_PATH).service(
                     actix_files::Files::new("/", "data/")

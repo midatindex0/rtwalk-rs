@@ -19,7 +19,8 @@ pub struct SearchResults {
 
 impl SearchResults {
     pub fn ids(&self) -> Vec<i32> {
-        self.inner.keys().copied().collect()
+        let ids = self.inner.keys().copied().collect::<Vec<_>>();
+        ids
     }
 
     pub fn map_id_score(&self, id: i32) -> Option<f32> {
@@ -41,12 +42,7 @@ impl IndexOp {
         )
     }
 
-    pub fn search(
-        &self,
-        query: &str,
-        offset: usize,
-        limit: usize,
-    ) -> anyhow::Result<SearchResults> {
+    pub fn search(&self, query: &str) -> anyhow::Result<SearchResults> {
         let searcher = self.1.searcher();
         let mut default_fields = vec![];
         let schema = self.2.schema();
@@ -57,7 +53,7 @@ impl IndexOp {
         default_fields.retain(|x| *x != id);
         let parser = QueryParser::for_index(&self.2, default_fields);
         let query = parser.parse_query(query)?;
-        let results = searcher.search(&query, &TopDocs::with_limit(limit).and_offset(offset))?;
+        let results = searcher.search(&query, &TopDocs::with_limit(1000))?;
         let mut scored_id = HashMap::new();
         for (score, add) in results {
             let document = searcher.doc(add)?;

@@ -7,7 +7,7 @@ use std::time::Instant;
 use crate::{
     constants::UNAUTHEMTICATED_MESSAGE,
     core::{packet::ActiveUser, session::RtSession, RtServer},
-    db::{models::post::Post, pool::PostgresPool},
+    db::models::post::Post,
     gql::query::{post::get_post_by_id, user::get_user_by_username},
     spawn_blocking,
 };
@@ -18,15 +18,17 @@ pub async fn connect(
     session: Session,
     stream: web::Payload,
     path: web::Path<(i32,)>,
-    pool: web::Data<PostgresPool>,
+    pool: web::Data<crate::Pool>,
     rt_server: web::Data<Addr<RtServer>>,
 ) -> Result<HttpResponse, Error> {
     let (post_id,) = path.into_inner();
     let mut conn = pool
-        .get()
+        .acquire()
+        .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     let mut conn1 = pool
-        .get()
+        .acquire()
+        .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     let id = uuid::Uuid::new_v4().to_string();
 

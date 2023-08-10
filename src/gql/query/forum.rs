@@ -1,12 +1,16 @@
 use async_graphql::{Enum, InputObject, OneofObject, SimpleObject};
 use diesel::dsl::{count, max};
-use diesel::prelude::*;
+use diesel::{prelude::*, sql_query};
+use serde::Serialize;
 
 use super::Page;
+use crate::db::models::comment::Comment;
 use crate::db::models::forum::Forum;
+use crate::db::models::post::Post;
+use crate::db::models::user::User;
 use crate::schema::forums::dsl::{id, name};
-use crate::schema::posts;
 use crate::schema::{comments, forums};
+use crate::schema::{posts, users};
 use crate::search::SearchIndex;
 
 #[derive(InputObject, Default)]
@@ -50,11 +54,12 @@ pub enum ForumOrderBy {
     Newest,
     Oldest,
     RecentPost,
+    None,
 }
 
 impl Default for ForumOrderBy {
     fn default() -> Self {
-        Self::RecentPost
+        Self::None
     }
 }
 
@@ -77,14 +82,15 @@ pub fn get_forums(
 
     let order = order.unwrap_or_default();
 
+    // TODO
+
     let mut common = forums::table
-        .inner_join(posts::table)
-        .inner_join(comments::table)
+        .left_join(posts::table)
+        .left_join(comments::table)
         .group_by(forums::id)
-        .having(count(posts::id).gt(filter.post_count.gt))
         .offset(filter.page.offset() as i64)
         .limit(filter.page.per as i64)
-        .select((Forum::as_select(), count(posts::id), count(comments::id)))
+        .select(Forum::as_select())
         .into_boxed();
 
     common = match order {
@@ -92,70 +98,65 @@ pub fn get_forums(
         ForumOrderBy::Comments => common.order(count(comments::id).desc()),
         ForumOrderBy::Newest => common.order(forums::created_at.desc()),
         ForumOrderBy::Oldest => common.order(forums::created_at.asc()),
-        ForumOrderBy::RecentPost =>  common.order(max(posts::created_at).desc()),
+        ForumOrderBy::RecentPost => common.order(max(posts::created_at).desc()),
+        ForumOrderBy::None => common,
     };
-
 
     let x: Vec<MultiForumReturn> = match criteria {
         ForumCriteria::Search(query) => {
-            let result = index.forum.search(
-                &query,
-                filter.page.offset() as usize,
-                filter.page.per as usize,
-            )?;
-            let ids = result.ids();
+            let result = index.forum.search(&query, 0, 500)?;
+            let ids: Vec<i32> = result.ids();
 
-            let _forums: Vec<(Forum, i64, i64)> = common
-                .filter(id.eq_any(ids))
-                .load::<(Forum, i64, i64)>(conn)?;
+            let _forums: Vec<Forum> = common.filter(id.eq_any(ids)).load::<Forum>(conn)?;
 
             let _forums = _forums
                 .into_iter()
                 .map(|x| MultiForumReturn {
-                    score: result.map_id_score(x.0.id),
-                    forum: x.0,
-                    num_posts: x.1,
-                    num_comments: x.2,
+                    score: result.map_id_score(x.id),
+                    forum: x,
+                    num_posts: 0,
+                    num_comments: 0,
                 })
                 .collect();
 
             _forums
         }
-        ForumCriteria::ByNames(names) => {
-            let _forums: Vec<(Forum, i64, i64)> =
-                common
-                    .filter(name.eq_any(names))
-                    .load::<(Forum, i64, i64)>(conn)?;
+        // ForumCriteria::ByNames(names) => {
+        //     let _forums: Vec<(Forum, i64, i64)> =
+        //         common
+        //             .filter(name.eq_any(names))
+        //             .load::<(Forum, i64, i64)>(conn)?;
 
-            let _forums = _forums
-                .into_iter()
-                .map(|x| MultiForumReturn {
-                    forum: x.0,
-                    num_posts: x.1,
-                    num_comments: x.2,
-                    score: None,
-                })
-                .collect();
+        //     let _forums = _forums
+        //         .into_iter()
+        //         .map(|x| MultiForumReturn {
+        //             forum: x.0,
+        //             num_posts: x.1,
+        //             num_comments: x.2,
+        //             score: None,
+        //         })
+        //         .collect();
 
-            _forums
-        }
-        ForumCriteria::ByIds(ids) => {
-            let _forums: Vec<(Forum, i64, i64)> = common
-                .filter(id.eq_any(ids))
-                .load::<(Forum, i64, i64)>(conn)?;
+        //     _forums
+        // }
+        // ForumCriteria::ByIds(ids) => {
+        //     let _forums: Vec<(Forum, i64, i64)> = common
+        //         .filter(id.eq_any(ids))
+        //         .load::<(Forum, i64, i64)>(conn)?;
 
-            let _forums = _forums
-                .into_iter()
-                .map(|x| MultiForumReturn {
-                    forum: x.0,
-                    num_posts: x.1,
-                    num_comments: x.2,
-                    score: None,
-                })
-                .collect();
+        //     let _forums = _forums
+        //         .into_iter()
+        //         .map(|x| MultiForumReturn {
+        //             forum: x.0,
+        //             num_posts: x.1,
+        //             num_comments: x.2,
+        //             score: None,
+        //         })
+        //         .collect();
 
-            _forums
-        }
+        //     _forums
+        // }
+        _ => todo!(),
     };
     Ok(x)
 }

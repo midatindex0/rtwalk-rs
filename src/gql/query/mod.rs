@@ -1,40 +1,54 @@
-mod comment;
-mod forum;
-pub mod post;
+// mod comment;
+// mod forum;
+// pub mod post;
 pub mod user;
 
-use forum::{ForumCriteria, ForumFilter};
+// use forum::{ForumCriteria, ForumFilter};
 use user::{UserCriteria, UserFilter};
 
-use async_graphql::{Context, InputObject, Object, Result};
+use async_graphql::{Context, Enum, InputObject, Object, Result};
+use futures::TryStreamExt;
+use sqlx::Row;
 
 use crate::{
-    db::{
-        models::{comment::CommentHierarchy, user::User},
-        pool::PostgresPool,
-    },
+    db::models::{comment::CommentHierarchy, user::User},
     info::VersionInfo,
     search::SearchIndex,
-    spawn_blocking,
 };
+
+use self::user::UserResponse;
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum PageOrder {
+    ASC,
+    DESC,
+}
+
+impl PageOrder {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::ASC => "ASC",
+            Self::DESC => "DESC",
+        }
+    }
+}
 
 #[derive(InputObject)]
 pub struct Page {
+    order: PageOrder,
     #[graphql(validator(minimum = 1))]
-    num: i64,
+    next_from: i32,
     #[graphql(validator(minimum = 1, maximum = 50))]
     per: i64,
 }
 
 impl Default for Page {
     fn default() -> Self {
-        Self { num: 1, per: 20 }
-    }
-}
-
-impl Page {
-    fn offset(&self) -> i64 {
-        (self.num - 1) * self.per
+        Self {
+            order: PageOrder::DESC,
+            next_from: i32::MAX,
+            per: 10,
+        }
     }
 }
 
@@ -46,14 +60,11 @@ impl Query {
         ctx.data::<VersionInfo>()
     }
 
-    /// TODO: Error Handling (in responses)
-    async fn user<'c>(&self, ctx: &Context<'c>, username: String) -> Result<User> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+    // TODO: Error Handling (in responses)
+    async fn user<'c>(&self, ctx: &Context<'c>, id: i32) -> Result<UserResponse> {
+        let pool = ctx.data::<crate::Pool>()?;
 
-        let user = actix_rt::task::spawn_blocking(move || {
-            user::get_user_by_username(&username, &mut conn)
-        })
-        .await??;
+        let user = user::get_user_by_id(id, &pool).await?;
         Ok(user)
     }
 
@@ -62,65 +73,88 @@ impl Query {
         ctx: &Context<'c>,
         filter: Option<UserFilter>,
         criteria: UserCriteria,
-    ) -> Result<Vec<User>> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
+    ) -> Result<Vec<UserResponse>> {
+        let pool = ctx.data::<crate::Pool>()?;
         let index = ctx.data::<SearchIndex>()?.clone();
 
-        let users = actix_rt::task::spawn_blocking(move || {
-            user::get_users(criteria, filter, &index, &mut conn)
-        })
-        .await??;
+        let users = user::get_users(criteria, filter, &index, &pool).await?;
 
         Ok(users)
     }
 
-    async fn forums<'c>(
-        &self,
-        ctx: &Context<'c>,
-        criteria: ForumCriteria,
-        filter: Option<ForumFilter>,
-        order: Option<forum::ForumOrderBy>
-    ) -> Result<Vec<forum::MultiForumReturn>> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
-        let index = ctx.data::<SearchIndex>()?.clone();
+    // async fn forums<'c>(
+    //     &self,
+    //     ctx: &Context<'c>,
+    //     criteria: ForumCriteria,
+    //     filter: Option<ForumFilter>,
+    //     order: Option<forum::ForumOrderBy>,
+    // ) -> Result<Vec<forum::MultiForumReturn>> {
+    //     let pool = ctx.data::<PostgresPool>()?.get()?;
+    //     let index = ctx.data::<SearchIndex>()?.clone();
 
-        let forums = actix_rt::task::spawn_blocking(move || {
-            forum::get_forums(criteria, filter, order, &index, &mut conn)
-        })
-        .await??;
+    //     let forums = actix_rt::task::spawn_blocking(move || {
+    //         forum::get_forums(criteria, filter, order, &index, &pool)
+    //     })
+    //     .await??;
 
-        Ok(forums)
-    }
+    //     Ok(forums)
+    // }
 
-    async fn posts<'c>(
-        &self,
-        ctx: &Context<'c>,
-        filter: Option<post::PostFilter>,
-        criteria: post::PostCriteria,
-    ) -> Result<Vec<post::MultiPostReturn>> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
-        let index = ctx.data::<SearchIndex>()?.clone();
+    // async fn posts<'c>(
+    //     &self,
+    //     ctx: &Context<'c>,
+    //     filter: Option<post::PostFilter>,
+    //     criteria: post::PostCriteria,
+    // ) -> Result<Vec<post::MultiPostReturn>> {
+    //     let pool = ctx.data::<PostgresPool>()?.get()?;
+    //     let index = ctx.data::<SearchIndex>()?.clone();
+    //     let pool = ctx.data::<crate::SqlxPool>()?;
 
-        let posts = actix_rt::task::spawn_blocking(move || {
-            post::get_posts(filter, criteria, &index, &mut conn)
-        })
-        .await??;
+    //     let mut r = sqlx::query(
+    //         "
+    //     SELECT f.*,
+    //         u.*,
+    //         COUNT(DISTINCT up.id) AS number_of_users_posted,
+    //         COUNT(p.id) AS number_of_posts,
+    //         STRING_AGG(
+    //             up.username,
+    //             ', '
+    //             ORDER BY up.username ASC
+    //         ) AS users_who_posted
+    //     FROM forums f
+    //         JOIN users u ON f.owner_id = u.id
+    //         LEFT JOIN posts p ON f.id = p.forum_id
+    //         LEFT JOIN users up ON p.poster_id = up.id
+    //     GROUP BY f.id,
+    //         u.id;
+    //     ",
+    //     )
+    //     .fetch(pool);
 
-        Ok(posts)
-    }
+    //     while let Some(x) = r.try_next().await? {
+    //         dbg!(x.columns());
+    //     }
 
-    async fn comments<'c>(
-        &self,
-        ctx: &Context<'c>,
-        filter: Option<comment::CommentFilter>,
-        criteria: comment::CommentCriteria,
-    ) -> Result<Vec<CommentHierarchy>> {
-        let mut conn = ctx.data::<PostgresPool>()?.get()?;
-        let index = ctx.data::<SearchIndex>()?.clone();
+    //     let posts = actix_rt::task::spawn_blocking(move || {
+    //         post::get_posts(filter, criteria, &index, &pool)
+    //     })
+    //     .await??;
 
-        let comments =
-            spawn_blocking!(comment::get_comments(filter, criteria, &index, &mut conn))??;
+    //     Ok(posts)
+    // }
 
-        Ok(comments)
-    }
+    // async fn comments<'c>(
+    //     &self,
+    //     ctx: &Context<'c>,
+    //     filter: Option<comment::CommentFilter>,
+    //     criteria: comment::CommentCriteria,
+    // ) -> Result<Vec<CommentHierarchy>> {
+    //     let pool = ctx.data::<PostgresPool>()?.get()?;
+    //     let index = ctx.data::<SearchIndex>()?.clone();
+
+    //     let comments =
+    //         spawn_blocking!(comment::get_comments(filter, criteria, &index, &pool))??;
+
+    //     Ok(comments)
+    // }
 }

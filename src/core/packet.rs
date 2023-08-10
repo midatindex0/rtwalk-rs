@@ -2,14 +2,14 @@ use actix::prelude::*;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::db::models::File;
+use crate::db::models::{FileList, MaybeEmptyFile};
 
 #[derive(Clone, Debug, Deserialize)]
 pub enum InPacket {
     Message {
         parent_id: Option<i32>,
         content: String,
-        media: Option<Vec<Option<File>>>,
+        media: FileList,
     },
     ListActiveUsers,
 }
@@ -20,8 +20,8 @@ pub struct ActiveUser {
     pub username: String,
     pub display_name: String,
     pub bio: Option<String>,
-    pub pfp: Option<File>,
-    pub banner: Option<File>,
+    pub pfp: MaybeEmptyFile,
+    pub banner: MaybeEmptyFile,
 }
 
 #[derive(Debug, Message)]
@@ -32,7 +32,7 @@ pub struct InComment {
     pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
-    pub media: Option<Vec<Option<File>>>,
+    pub media: FileList,
 }
 
 #[derive(Debug, Message, Serialize)]
@@ -45,7 +45,7 @@ pub struct OutComment {
     pub forum_id: i32,
     pub parent_id: Option<i32>,
     pub content: String,
-    pub media: Option<Vec<Option<File>>>,
+    pub media: FileList,
 }
 
 #[derive(Debug, Message, Serialize)]

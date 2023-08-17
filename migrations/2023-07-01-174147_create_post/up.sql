@@ -12,3 +12,5 @@ CREATE TABLE posts (
     forum_id INTEGER NOT NULL REFERENCES forums(id),
     poster_id INTEGER NOT NULL REFERENCES users(id)
 );
+
+CREATE INDEX post_index ON posts USING btree (id DESC);

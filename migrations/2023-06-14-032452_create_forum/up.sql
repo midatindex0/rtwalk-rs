@@ -9,3 +9,5 @@ CREATE TABLE forums (
     created_at TIMESTAMP NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     owner_id INTEGER NOT NULL REFERENCES users(id)
 );
+
+CREATE INDEX forum_index ON forums USING btree (id DESC);

@@ -1,2 +1,2 @@
--- This file should undo anything in `up.sql`
+DROP INDEX IF EXISTS comment_index;
 DROP TABLE comments

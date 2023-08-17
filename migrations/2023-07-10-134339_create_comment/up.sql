@@ -10,3 +10,5 @@ CREATE TABLE comments (
     edited BOOLEAN NOT NULL DEFAULT FALSE,
     edited_at TIMESTAMP
 );
+
+CREATE INDEX comment_index ON comments USING btree (id DESC);

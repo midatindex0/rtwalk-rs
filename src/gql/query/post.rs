@@ -48,8 +48,6 @@ pub enum PostCriteria {
 #[derive(Enum, Clone, Copy, Eq, PartialEq)]
 pub enum PostOrderBy {
     Comments,
-    Newest,
-    Oldest,
     RecentComment,
 }
 

@@ -10,4 +10,4 @@ CREATE TABLE users (
     v INTEGER NOT NULL DEFAULT 0,
     admin BOOLEAN NOT NULL DEFAULT FALSE
 );
-CREATE INDEX user_id_index ON users USING btree (id DESC);
+CREATE INDEX user_index ON users USING btree (id DESC, username);

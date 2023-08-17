@@ -16,7 +16,7 @@ use crate::{
     search::SearchIndex,
 };
 
-use self::user::UserResponse;
+use self::user::{UserOrder, UserResponse};
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum PageOrder {
@@ -35,26 +35,39 @@ impl PageOrder {
 
 #[derive(InputObject)]
 pub struct Page {
-    order: PageOrder,
+    order: Option<PageOrder>,
     #[graphql(validator(minimum = 1))]
     next_from: i32,
     #[graphql(validator(minimum = 1, maximum = 50))]
-    per: i64,
+    limit: Option<i64>,
 }
 
-impl Default for Page {
-    fn default() -> Self {
-        Self {
-            order: PageOrder::DESC,
-            next_from: i32::MAX,
-            per: 10,
+impl From<Option<Page>> for RawPage {
+    fn from(value: Option<Page>) -> Self {
+        match value {
+            None => Self {
+                order: PageOrder::DESC,
+                next_from: i32::MAX,
+                per: 10,
+            },
+            Some(filter) => Self {
+                order: filter.order.unwrap_or(PageOrder::DESC),
+                next_from: filter.next_from,
+                per: filter.limit.unwrap_or(10).min(50),
+            },
         }
     }
 }
 
+pub struct RawPage {
+    order: PageOrder,
+    next_from: i32,
+    per: i64,
+}
+
 pub struct Query;
 
-#[Object]
+#[Object(cache_control(max_age = 60))]
 impl Query {
     async fn version<'c>(&self, ctx: &Context<'c>) -> Result<&'c VersionInfo> {
         ctx.data::<VersionInfo>()
@@ -72,12 +85,21 @@ impl Query {
         &self,
         ctx: &Context<'c>,
         filter: Option<UserFilter>,
+        order: Option<UserOrder>,
         criteria: UserCriteria,
     ) -> Result<Vec<UserResponse>> {
         let pool = ctx.data::<crate::Pool>()?;
         let index = ctx.data::<SearchIndex>()?.clone();
 
-        let users = user::get_users(criteria, filter, &index, &pool).await?;
+        let users = user::get_users(criteria, filter, order, &index, &pool).await?;
+
+        Ok(users)
+    }
+
+    async fn top_users<'c>(&self, ctx: &Context<'c>) -> Result<Vec<UserResponse>> {
+        let pool = ctx.data::<crate::Pool>()?;
+
+        let users = user::top(&pool).await?;
 
         Ok(users)
     }

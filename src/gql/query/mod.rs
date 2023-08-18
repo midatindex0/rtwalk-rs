@@ -1,9 +1,9 @@
 // mod comment;
-// mod forum;
+mod forum;
 // pub mod post;
 pub mod user;
 
-// use forum::{ForumCriteria, ForumFilter};
+use forum::{ForumCriteria, ForumFilter};
 use user::{UserCriteria, UserFilter};
 
 use async_graphql::{Context, Enum, InputObject, Object, Result};
@@ -104,23 +104,20 @@ impl Query {
         Ok(users)
     }
 
-    // async fn forums<'c>(
-    //     &self,
-    //     ctx: &Context<'c>,
-    //     criteria: ForumCriteria,
-    //     filter: Option<ForumFilter>,
-    //     order: Option<forum::ForumOrderBy>,
-    // ) -> Result<Vec<forum::MultiForumReturn>> {
-    //     let pool = ctx.data::<PostgresPool>()?.get()?;
-    //     let index = ctx.data::<SearchIndex>()?.clone();
+    async fn forums<'c>(
+        &self,
+        ctx: &Context<'c>,
+        criteria: ForumCriteria,
+        filter: Option<ForumFilter>,
+        order: Option<forum::ForumOrderBy>,
+    ) -> Result<Vec<forum::ForumResponse>> {
+        let pool = ctx.data::<crate::Pool>()?;
+        let index = ctx.data::<SearchIndex>()?.clone();
 
-    //     let forums = actix_rt::task::spawn_blocking(move || {
-    //         forum::get_forums(criteria, filter, order, &index, &pool)
-    //     })
-    //     .await??;
+        let forums = forum::get_forums(criteria, filter, order, &index, &pool).await?;
 
-    //     Ok(forums)
-    // }
+        Ok(forums)
+    }
 
     // async fn posts<'c>(
     //     &self,

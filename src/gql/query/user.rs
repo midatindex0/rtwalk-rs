@@ -206,7 +206,7 @@ pub struct UserResponse {
     pub owned_forum_count: i64,
     pub post_count: i64,
     pub comment_count: i64,
-    pub stars: i64,
+    pub stars: Option<i64>,
     pub score: Option<f32>,
 }
 
@@ -247,7 +247,6 @@ pub async fn get_users(
         PageOrder::ASC => ">",
         PageOrder::DESC => "<"
     }, filter.admin_str, filter.page.order.as_str());
-
 
     let sql_query = sqlx::query(query_str.as_str())
         .bind(filter.page.next_from)

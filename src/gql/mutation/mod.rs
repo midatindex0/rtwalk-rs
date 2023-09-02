@@ -143,14 +143,10 @@ impl Mutation {
         ctx: &Context<'c>,
         username: String,
         password: String,
-    ) -> Result<bool> {
+    ) -> Result<User> {
         let pool = ctx.data::<crate::Pool>()?;
         let hasher = ctx.data::<Argon2>()?.clone();
         let session = ctx.data::<SharedSession>()?;
-
-        if session.get::<String>("username")?.is_some() {
-            return Ok(true);
-        }
 
         let x = user::verify_user(&username, &password, pool, &hasher).await?;
 
@@ -159,8 +155,8 @@ impl Mutation {
                 session.insert("id", user.id)?;
                 session.insert("admin", user.admin)?;
                 session.insert("username", username)?;
-                session.insert("pfp", user.pfp.id)?;
-                Ok(true)
+                session.insert("pfp", user.pfp.id.clone())?;
+                Ok(user)
             }
             (false, _) => Err(UserAuthError::InvalidUsernameOrPassword(
                 "Username or password is invalid",

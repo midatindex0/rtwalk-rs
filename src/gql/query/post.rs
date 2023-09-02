@@ -1,14 +1,12 @@
 use async_graphql::{Enum, InputObject, OneofObject, SimpleObject};
-use diesel::prelude::*;
+use futures::StreamExt;
+use sqlx::postgres::PgRow;
+use sqlx::{FromRow, Row};
 
-use super::Page;
-use crate::db::models::comment::Comment;
+use super::{Page, PageOrder, RawPage};
 use crate::db::models::forum::Forum;
-use crate::db::models::post::{Post, RawPost};
+use crate::db::models::post::Post;
 use crate::db::models::user::User;
-use crate::schema::posts;
-use crate::schema::posts::dsl::*;
-use crate::schema::{comments, forums, users};
 use crate::search::SearchIndex;
 
 #[derive(InputObject, Default)]
@@ -23,7 +21,7 @@ pub struct PostFilter {
 }
 
 struct RawPostFilter {
-    page: Page,
+    page: RawPage,
     star: StarFilter,
 }
 
@@ -31,7 +29,7 @@ impl From<Option<PostFilter>> for RawPostFilter {
     fn from(value: Option<PostFilter>) -> Self {
         let value = value.unwrap_or_default();
         Self {
-            page: value.page.unwrap_or_default(),
+            page: value.page.into(),
             star: value.star_count.unwrap_or_default(),
         }
     }
@@ -42,146 +40,120 @@ pub enum PostCriteria {
     Search(String),
     BySlugs(Vec<String>),
     ByIds(Vec<i32>),
-    ByForumId(i32),
-}
-
-#[derive(Enum, Clone, Copy, Eq, PartialEq)]
-pub enum PostOrderBy {
-    Comments,
-    RecentComment,
-}
-
-impl Default for PostOrderBy {
-    fn default() -> Self {
-        Self::Newest
-    }
 }
 
 #[derive(SimpleObject)]
-pub struct MultiPostReturn {
-    pub post: RawPost,
+pub struct PostResponse {
+    pub post: Post,
     // pub poster: User,
     // pub forum: Forum,
-    // pub num_comments: i64,
-    // pub participants: Vec<User>,
+    // pub comment_count: i64,
+    // pub participant_count: i64,
     pub score: Option<f32>,
 }
 
-pub fn get_posts(
-    filter: Option<PostFilter>,
+pub async fn get_posts(
     criteria: PostCriteria,
+    filter: Option<PostFilter>,
     index: &SearchIndex,
-    conn: &mut crate::Conn,
-) -> anyhow::Result<Vec<MultiPostReturn>> {
+    pool: &crate::Pool,
+) -> anyhow::Result<Vec<PostResponse>> {
     let filter: RawPostFilter = filter.into();
 
-    let common = posts::table
-        .filter(stars.ge(filter.star.gt))
-        .offset(filter.page.offset() as i64)
-        .limit(filter.page.per as i64)
-        .select(Post::as_select())
-        .into_boxed();
+    let query_str = format!(
+        "
+        SELECT p.*
+        FROM posts p
+        LEFT JOIN forums f ON f.id = p.forum_id
+        LEFT JOIN users poster ON poster.id = p.poster_id
+        WHERE p.{} = ANY($3) AND p.id {}= $1
+        GROUP BY p.id
+        ORDER BY p.id {}
+        LIMIT $2;
+    ",
+        match &criteria {
+            PostCriteria::Search(_) | PostCriteria::ByIds(_) => "id",
+            PostCriteria::BySlugs(_) => "slug",
+        },
+        match filter.page.order {
+            PageOrder::ASC => ">",
+            PageOrder::DESC => "<",
+        },
+        filter.page.order.as_str()
+    );
 
-    let _posts: Vec<MultiPostReturn> = match criteria {
+    println!("{}", &query_str);
+
+    let sql_query = sqlx::query(query_str.as_str())
+        .bind(filter.page.next_from)
+        .bind(filter.page.per);
+
+    let x: Vec<PostResponse> = match criteria {
         PostCriteria::Search(query) => {
-            let result = index.post.search(
-                &query,
-                filter.page.offset() as usize,
-                filter.page.per as usize,
-            )?;
+            let results = index.post.search(&query)?;
+            let ids = results.ids();
 
-            let ids = result.ids();
-
-            let _posts: Vec<Post> = posts::table
-                .select(Post::as_select())
-                .filter(id.eq_any(ids))
-                .load(conn)?;
-
-            let _posts = _posts
-                .into_iter()
-                .map(|x| MultiPostReturn {
-                    score: result.map_id_score(x.id),
-                    post: RawPost::from(x),
-                    // poster: x.1,
-                    // forum: x.2,
+            let posts = sql_query
+                .bind(ids)
+                .map(|row: PgRow| PostResponse {
+                    // cant fail because we know the fields
+                    post: Post::from_row(&row).unwrap(),
+                    score: results.map_id_score(row.get("id")),
                 })
-                .collect();
-            _posts
+                .fetch(pool)
+                .filter_map(|x| async move { x.ok() })
+                .collect::<Vec<_>>()
+                .await;
+            posts
         }
         PostCriteria::BySlugs(slugs) => {
-            let _posts: Vec<(Post, User, Forum)> = posts
-                .inner_join(users::table)
-                .inner_join(forums::table)
-                .filter(slug.eq_any(slugs))
-                .filter(stars.gt(filter.star.gt))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Post::as_select(), User::as_select(), Forum::as_select()))
-                .load(conn)?;
-
-            let _posts = _posts
-                .into_iter()
-                .map(|x| MultiPostReturn {
+            let posts = sql_query
+                .bind(slugs)
+                .map(|row: PgRow| PostResponse {
+                    // cant fail because we know the fields
+                    post: Post::from_row(&row).unwrap(),
                     score: None,
-                    post: RawPost::from(x.0),
-                    // poster: x.1,
-                    // forum: x.2,
                 })
-                .collect();
-            _posts
+                .fetch(pool)
+                .filter_map(|x| async move { x.ok() })
+                .collect::<Vec<_>>()
+                .await;
+            posts
         }
         PostCriteria::ByIds(ids) => {
-            let _posts: Vec<(Post, User, Forum)> = posts
-                .inner_join(users::table)
-                .inner_join(forums::table)
-                .filter(id.eq_any(ids))
-                .filter(stars.gt(filter.star.gt))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Post::as_select(), User::as_select(), Forum::as_select()))
-                .load(conn)?;
-
-            let _posts = _posts
-                .into_iter()
-                .map(|x| MultiPostReturn {
+            let posts = sql_query
+                .bind(ids)
+                .map(|row: PgRow| PostResponse {
+                    // cant fail because we know the fields
+                    post: Post::from_row(&row).unwrap(),
                     score: None,
-                    post: RawPost::from(x.0),
-                    // poster: x.1,
-                    // forum: x.2,
                 })
-                .collect();
-            _posts
-        }
-        PostCriteria::ByForumId(fid) => {
-            let _posts: Vec<(Post, User, Forum)> = posts
-                .inner_join(users::table)
-                .inner_join(forums::table)
-                .filter(forum_id.eq(fid))
-                .filter(stars.gt(filter.star.gt))
-                .offset(filter.page.offset() as i64)
-                .limit(filter.page.per as i64)
-                .select((Post::as_select(), User::as_select(), Forum::as_select()))
-                .load(conn)?;
-
-            let _posts = _posts
-                .into_iter()
-                .map(|x| MultiPostReturn {
-                    score: None,
-                    post: RawPost::from(x.0),
-                    // poster: x.1,
-                    // forum: x.2,
-                })
-                .collect();
-            _posts
+                .fetch(pool)
+                .filter_map(|x| async move { x.ok() })
+                .collect::<Vec<_>>()
+                .await;
+            posts
         }
     };
-    Ok(_posts)
+
+    Ok(x)
 }
 
-pub fn get_post_by_id(_id: &i32, conn: &mut crate::Conn) -> anyhow::Result<Post> {
-    let s = posts
-        .filter(id.eq(_id))
-        .select(Post::as_select())
-        .get_result(conn);
-    Ok(s?)
+pub async fn get_post_by_slug(slug: &String, pool: &crate::Pool) -> anyhow::Result<PostResponse> {
+    let post = sqlx::query(
+        "
+            SELECT p.*
+            FROM posts p
+            WHERE p.slug = $1
+            GROUP BY p.id;",
+    )
+    .bind(slug)
+    .fetch_one(pool)
+    .await
+    .map(|row| PostResponse {
+        // cant fail because we know the fields
+        post: Post::from_row(&row).unwrap(),
+        score: None,
+    })?;
+    Ok(post)
 }

@@ -1,22 +1,27 @@
 // mod comment;
 mod forum;
-// pub mod post;
+pub mod post;
 pub mod user;
 
 use forum::{ForumCriteria, ForumFilter};
 use user::{UserCriteria, UserFilter};
 
-use async_graphql::{Context, Enum, InputObject, Object, Result};
+use async_graphql::{Context, Enum, ErrorExtensions, InputObject, Object, Result};
 use futures::TryStreamExt;
 use sqlx::Row;
 
 use crate::{
+    auth::SharedSession,
+    constants,
     db::models::{comment::CommentHierarchy, user::User},
     info::VersionInfo,
     search::SearchIndex,
 };
 
-use self::user::{UserOrder, UserResponse};
+use self::{
+    post::PostResponse,
+    user::{UserOrder, UserResponse},
+};
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum PageOrder {
@@ -74,6 +79,21 @@ impl Query {
     }
 
     // TODO: Error Handling (in responses)
+    async fn me<'c>(&self, ctx: &Context<'c>) -> Result<UserResponse> {
+        let pool = ctx.data::<crate::Pool>()?;
+        let session = ctx.data::<SharedSession>()?;
+        let id = session.get::<i32>("id")?;
+
+        if let Some(id) = id {
+            let user = user::get_user_by_id(id, &pool).await?;
+            return Ok(user);
+        }
+        Err(
+            async_graphql::Error::new(constants::UNAUTHEMTICATED_MESSAGE)
+                .extend_with(|_, e| e.set("code", "401")),
+        )
+    }
+
     async fn user<'c>(&self, ctx: &Context<'c>, id: i32) -> Result<UserResponse> {
         let pool = ctx.data::<crate::Pool>()?;
 
@@ -119,48 +139,26 @@ impl Query {
         Ok(forums)
     }
 
-    // async fn posts<'c>(
-    //     &self,
-    //     ctx: &Context<'c>,
-    //     filter: Option<post::PostFilter>,
-    //     criteria: post::PostCriteria,
-    // ) -> Result<Vec<post::MultiPostReturn>> {
-    //     let pool = ctx.data::<PostgresPool>()?.get()?;
-    //     let index = ctx.data::<SearchIndex>()?.clone();
-    //     let pool = ctx.data::<crate::SqlxPool>()?;
+    async fn posts<'c>(
+        &self,
+        ctx: &Context<'c>,
+        filter: Option<post::PostFilter>,
+        criteria: post::PostCriteria,
+    ) -> Result<Vec<post::PostResponse>> {
+        let pool = ctx.data::<crate::Pool>()?;
+        let index = ctx.data::<SearchIndex>()?.clone();
 
-    //     let mut r = sqlx::query(
-    //         "
-    //     SELECT f.*,
-    //         u.*,
-    //         COUNT(DISTINCT up.id) AS number_of_users_posted,
-    //         COUNT(p.id) AS number_of_posts,
-    //         STRING_AGG(
-    //             up.username,
-    //             ', '
-    //             ORDER BY up.username ASC
-    //         ) AS users_who_posted
-    //     FROM forums f
-    //         JOIN users u ON f.owner_id = u.id
-    //         LEFT JOIN posts p ON f.id = p.forum_id
-    //         LEFT JOIN users up ON p.poster_id = up.id
-    //     GROUP BY f.id,
-    //         u.id;
-    //     ",
-    //     )
-    //     .fetch(pool);
+        let posts = post::get_posts(criteria, filter, &index, &pool).await?;
 
-    //     while let Some(x) = r.try_next().await? {
-    //         dbg!(x.columns());
-    //     }
+        Ok(posts)
+    }
 
-    //     let posts = actix_rt::task::spawn_blocking(move || {
-    //         post::get_posts(filter, criteria, &index, &pool)
-    //     })
-    //     .await??;
+    async fn post<'c>(&self, ctx: &Context<'c>, slug: String) -> Result<PostResponse> {
+        let pool = ctx.data::<crate::Pool>()?;
 
-    //     Ok(posts)
-    // }
+        let post = post::get_post_by_slug(&slug, &pool).await?;
+        Ok(post)
+    }
 
     // async fn comments<'c>(
     //     &self,

@@ -153,6 +153,18 @@ impl Query {
         Ok(posts)
     }
 
+    async fn forum_posts<'c>(
+        &self,
+        ctx: &Context<'c>,
+        forum_name: String,
+        filter: Option<post::PostFilter>,
+    ) -> Result<Vec<PostResponse>> {
+        let pool = ctx.data::<crate::Pool>()?;
+
+        let post = post::get_posts_by_forum_name(&forum_name, filter, &pool).await;
+        Ok(post)
+    }
+
     async fn post<'c>(&self, ctx: &Context<'c>, slug: String) -> Result<PostResponse> {
         let pool = ctx.data::<crate::Pool>()?;
 

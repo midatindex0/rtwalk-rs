@@ -38,6 +38,7 @@ impl From<Option<PostFilter>> for RawPostFilter {
 #[derive(OneofObject)]
 pub enum PostCriteria {
     Search(String),
+    ByForumId(i32),
     BySlugs(Vec<String>),
     ByIds(Vec<i32>),
 }
@@ -74,6 +75,7 @@ pub async fn get_posts(
         match &criteria {
             PostCriteria::Search(_) | PostCriteria::ByIds(_) => "id",
             PostCriteria::BySlugs(_) => "slug",
+            PostCriteria::ByForumId(_) => "forum_id",
         },
         match filter.page.order {
             PageOrder::ASC => ">",
@@ -99,6 +101,20 @@ pub async fn get_posts(
                     // cant fail because we know the fields
                     post: Post::from_row(&row).unwrap(),
                     score: results.map_id_score(row.get("id")),
+                })
+                .fetch(pool)
+                .filter_map(|x| async move { x.ok() })
+                .collect::<Vec<_>>()
+                .await;
+            posts
+        }
+        PostCriteria::ByForumId(id) => {
+            let posts = sql_query
+                .bind(vec![id])
+                .map(|row: PgRow| PostResponse {
+                    // cant fail because we know the fields
+                    post: Post::from_row(&row).unwrap(),
+                    score: None,
                 })
                 .fetch(pool)
                 .filter_map(|x| async move { x.ok() })
@@ -139,7 +155,7 @@ pub async fn get_posts(
     Ok(x)
 }
 
-pub async fn get_post_by_slug(slug: &String, pool: &crate::Pool) -> anyhow::Result<PostResponse> {
+pub async fn get_post_by_slug(slug: &str, pool: &crate::Pool) -> anyhow::Result<PostResponse> {
     let post = sqlx::query(
         "
             SELECT p.*
@@ -156,4 +172,42 @@ pub async fn get_post_by_slug(slug: &String, pool: &crate::Pool) -> anyhow::Resu
         score: None,
     })?;
     Ok(post)
+}
+
+pub async fn get_posts_by_forum_name(
+    name: &str,
+    filter: Option<PostFilter>,
+    pool: &crate::Pool,
+) -> Vec<PostResponse> {
+    let filter: RawPostFilter = filter.into();
+
+    let posts = sqlx::query(&format!(
+        "
+            SELECT p.*
+            FROM posts p
+            LEFT JOIN forums f ON f.id = p.forum_id
+            LEFT JOIN users poster ON poster.id = p.poster_id
+            WHERE f.name = $3 AND p.id {}= $1
+            GROUP BY p.id
+            ORDER BY p.id {}
+            LIMIT $2;
+            ",
+        match filter.page.order {
+            PageOrder::ASC => ">",
+            PageOrder::DESC => "<",
+        },
+        filter.page.order.as_str()
+    ))
+    .bind(filter.page.next_from)
+    .bind(filter.page.per)
+    .bind(name)
+    .map(|row: PgRow| PostResponse {
+        post: Post::from_row(&row).unwrap(),
+        score: None,
+    })
+    .fetch(pool)
+    .filter_map(|x| async move { x.ok() })
+    .collect::<Vec<_>>()
+    .await;
+    posts
 }

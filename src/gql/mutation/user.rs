@@ -1,7 +1,6 @@
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use async_graphql::InputObject;
-use log;
-use sqlx::{any, Execute, Postgres, QueryBuilder};
+use sqlx::{QueryBuilder, Postgres};
 
 use crate::db::models::user::User;
 use crate::db::models::user::{NewUser, UpdateUser};

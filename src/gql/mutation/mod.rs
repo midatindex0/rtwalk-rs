@@ -155,7 +155,6 @@ impl Mutation {
                 session.insert("id", user.id)?;
                 session.insert("admin", user.admin)?;
                 session.insert("username", username)?;
-                session.insert("pfp", user.pfp.id.clone())?;
                 Ok(user)
             }
             (false, _) => Err(UserAuthError::InvalidUsernameOrPassword(

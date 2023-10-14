@@ -1,5 +1,5 @@
 use async_graphql::InputObject;
-use sqlx::{query, Postgres, QueryBuilder};
+use sqlx::{Postgres, QueryBuilder};
 
 use crate::db::models::comment::{Comment, UpdateComment};
 use crate::db::models::{comment::NewComment, FileList};

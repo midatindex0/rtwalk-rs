@@ -7,53 +7,42 @@ use std::time::Instant;
 use crate::{
     constants::UNAUTHEMTICATED_MESSAGE,
     core::{packet::ActiveUser, session::RtSession, RtServer},
-    db::models::post::Post,
-    gql::query::{post::get_post_by_id, user::get_user_by_username},
-    spawn_blocking,
+    gql::query::{post::get_post_by_slug, user::get_user_by_id},
 };
 
-#[get("/connect/{post_id}")]
+#[get("/connect/{post_slug}")]
 pub async fn connect(
     req: HttpRequest,
     session: Session,
     stream: web::Payload,
-    path: web::Path<(i32,)>,
-    pool: web::Data<crate::Pool>,
+    path: web::Path<(String,)>,
+    pool: web::Data<crate::PgPool>,
     rt_server: web::Data<Addr<RtServer>>,
 ) -> Result<HttpResponse, Error> {
-    let (post_id,) = path.into_inner();
-    let mut conn = pool
-        .acquire()
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
-    let mut conn1 = pool
-        .acquire()
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    let (post_slug,) = path.into_inner();
+    log::info!("Connected to WS: {}", &post_slug);
     let id = uuid::Uuid::new_v4().to_string();
 
-    if let Some(username) = session.get::<String>("username")? {
-        let user = spawn_blocking!(get_user_by_username(&username, &mut conn1))
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?
+    if let Some(user_id) = session.get::<i32>("id")? {
+        let user = get_user_by_id(user_id, &pool).await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
-        let post: Post = spawn_blocking!(get_post_by_id(&post_id, &mut conn))
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e))?
+        let post = get_post_by_slug(&post_slug, &pool).await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
 
         ws::start(
             RtSession {
                 id,
                 hb: Instant::now(),
-                post_id,
-                forum_id: post.forum_id,
+                post_id: post.post.id,
+                forum_id: post.post.forum_id,
                 user: ActiveUser {
-                    id: user.id,
-                    username: user.username,
-                    display_name: user.display_name,
-                    bio: user.bio,
-                    pfp: user.pfp,
-                    banner: user.banner,
+                    id: user.user.id,
+                    username: user.user.username,
+                    display_name: user.user.display_name,
+                    bio: user.user.bio,
+                    pfp: user.user.pfp,
+                    banner: user.user.banner,
                 },
                 addr: rt_server.get_ref().clone(),
             },

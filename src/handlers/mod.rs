@@ -1,2 +1,2 @@
 pub mod gql;
-// pub mod ws;
+pub mod ws;

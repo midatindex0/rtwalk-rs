@@ -1,10 +1,8 @@
 use async_graphql::InputObject;
-use log;
 use sqlx::{Postgres, QueryBuilder};
 
 use crate::db::models::forum::{Forum, NewForum, UpdateForum};
 use crate::db::models::MaybeEmptyFile;
-use crate::error::ForumCreationError;
 
 #[derive(InputObject)]
 pub struct BasicForumUpdate {

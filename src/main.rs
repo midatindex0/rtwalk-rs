@@ -27,14 +27,13 @@ use std::env;
 use crate::{
     constants::CDN_PATH,
     core::{event::EventManager, RtServer},
-    search::SearchIndex,
+    search::SearchIndex, handlers::ws::connect,
 };
 
 use self::gql::root::{Mutation, Query, Schema, Subscription};
 use self::handlers::gql::{gql_handler, gql_playground_handler, gql_ws_handler};
 
 type Pool = sqlx::Pool<sqlx::Postgres>;
-// type Conn = sqlx::pool::PoolConnection<sqlx::Postgres>;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
@@ -90,7 +89,7 @@ async fn main() -> std::io::Result<()> {
                     .guard(guard::Header("upgrade", "websocket"))
                     .to(gql_ws_handler),
             )
-            // .service(connect)
+            .service(connect)
             .service(
                 web::scope(CDN_PATH).service(
                     actix_files::Files::new("/", "data/")
